@@ -1,9 +1,11 @@
 // #include <blaze/Math.h>
 #include "fmt/core.h"
 #include "fmt/format.h"
+#include <algorithm>
 #include <array>
 #include <iostream>
 #include <type_traits>
+#include <variant>
 #include <vector>
 
 /*
@@ -57,7 +59,7 @@ struct Element;
 struct Expression
 {
     const Element *lhs;
-    const Element *rhs;
+    std::variant<const Element *, float> rhs;
     Operations op;
 };
 
@@ -67,7 +69,12 @@ struct fmt::formatter<Expression> : formatter<string_view>
     template<typename FormatContext>
     auto format(const Expression &expr, FormatContext &ctx)
     {
-        return format_to(ctx.out(), "{} {} {}", fmt::ptr(expr.lhs), expr.op, fmt::ptr(expr.rhs));
+        if (std::holds_alternative<float>(expr.rhs)) {
+            float f = std::get<float>(expr.rhs);
+            return format_to(ctx.out(), "{} {} (float){}", fmt::ptr(expr.lhs), expr.op, f);
+        }
+        const Element *elem_ptr = std::get<const Element *>(expr.rhs);
+        return format_to(ctx.out(), "{} {} {}", fmt::ptr(expr.lhs), expr.op, fmt::ptr(elem_ptr));
     }
 };
 
@@ -140,14 +147,61 @@ struct Element
         log->push_back(op);
         return *this;
     }
+
+    Expression operator+(const float other)
+    {
+        Expression expr;
+        expr.lhs = get_id();
+        expr.op = Operations::ADD;
+        expr.rhs = other;
+        return expr;
+    }
+
+    Expression operator*(const float other)
+    {
+        Expression expr;
+        expr.lhs = get_id();
+        expr.op = Operations::MULTIPLY;
+        expr.rhs = other;
+        return expr;
+    }
+
+    Expression operator/(const float other)
+    {
+        Expression expr;
+        expr.lhs = get_id();
+        expr.op = Operations::DIVIDE;
+        expr.rhs = other;
+        return expr;
+    }
+
+    Expression operator-(const float other)
+    {
+        Expression expr;
+        expr.lhs = get_id();
+        expr.op = Operations::SUBSTRACT;
+        expr.rhs = other;
+        return expr;
+    }
+
+    // Element(const Element &other) = delete;
+    // Element(Element &&other) = delete;
+    // Element(const ElementInitializer &other)
+    //     : log{other.log}
+    // {}
 };
 
 int main()
 {
     std::vector<BinOp> log{};
-    std::vector<Element> vec{100, Element(&log)};
+    std::vector<Element> vec{100, &log};
+    // vec.reserve(100);
+    // for (int i = 0; i < 100; ++i) {
+    //     vec.emplace_back(&log);
+    // }
 
     vec[0] = vec[1] + vec[0];
+    vec[1] = vec[1] + 0.1;
 
     for (auto &v : log) {
         fmt::println("{}", v);
