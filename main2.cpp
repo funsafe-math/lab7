@@ -1,209 +1,185 @@
 // #include <blaze/Math.h>
+#include "Expression.hpp"
+#include "Matrix.hpp"
+
 #include "fmt/core.h"
-#include "fmt/format.h"
 #include <algorithm>
 #include <array>
+#include <functional>
 #include <iostream>
+#include <map>
+#include <span>
 #include <type_traits>
 #include <variant>
 #include <vector>
 
-/*
- * Goals:
- * - calculate max amount of threads that can be used for the computation
- * - calculate 2D pseudo-matrix of calculations to perform
- * 
- * 2 versions:
- * - dynamic
- * - compile-time-known
- * 
- * Possible optimizations:
- * - When running on a platform supporting SIMD (like modern x86), in a foata layer, group tasks to use SIMD functionality
- * 
- * Look at https://godbolt.org/z/zdEE3fr7o
-*/
+namespace analysis {
 
-// Tracing test
-enum class Operations { UNKNOWN, ADD, MULTIPLY, SUBSTRACT, DIVIDE };
+enum class VariableType { UNKNOWN, TEMPORARY, FINAL, LITERAL };
+
+struct Variable
+{
+    size_t index{};
+    VariableType type{};
+};
+
+struct BinOp
+{
+    Variable lhs;
+    Variable rhs;
+    Operations op;
+};
+
+using Expression = std::variant<Variable, BinOp>;
+
+struct Production
+{
+    Variable lhs{};
+    Expression rhs{};
+};
+
+} // namespace analysis
 
 template<>
-struct fmt::formatter<Operations> : formatter<string_view>
+struct fmt::formatter<analysis::VariableType> : formatter<string_view>
 {
     template<typename FormatContext>
-    auto format(Operations operation, FormatContext &ctx)
+    auto format(analysis::VariableType type, FormatContext &ctx)
     {
         string_view name = "unknown";
-        switch (operation) {
-        case Operations::UNKNOWN:
-            name = "unknown";
+        switch (type) {
+        case analysis::VariableType::UNKNOWN:
+            name = "UNKNOWN";
             break;
-        case Operations::ADD:
-            name = "+";
+        case analysis::VariableType::TEMPORARY:
+            name = "temporary";
             break;
-        case Operations::MULTIPLY:
-            name = "*";
-            break;
-        case Operations::SUBSTRACT:
-            name = "-";
-            break;
-        case Operations::DIVIDE:
-            name = "/";
+        case analysis::VariableType::FINAL:
+            name = "final";
             break;
         }
         return formatter<string_view>::format(name, ctx);
     }
 };
 
-struct Element;
-
-struct Expression
+template<>
+struct fmt::formatter<analysis::Variable> : formatter<string_view>
 {
-    const Element *lhs;
-    std::variant<const Element *, float> rhs;
-    Operations op;
+    template<typename FormatContext>
+    auto format(const analysis::Variable &variable, FormatContext &ctx)
+    {
+        return format_to(ctx.out(), "{}_{}", variable.type, variable.index);
+    }
 };
 
 template<>
-struct fmt::formatter<Expression> : formatter<string_view>
+struct fmt::formatter<analysis::BinOp> : formatter<string_view>
 {
     template<typename FormatContext>
-    auto format(const Expression &expr, FormatContext &ctx)
+    auto format(const analysis::BinOp &binary_operation, FormatContext &ctx)
     {
-        if (std::holds_alternative<float>(expr.rhs)) {
-            float f = std::get<float>(expr.rhs);
-            return format_to(ctx.out(), "{} {} (float){}", fmt::ptr(expr.lhs), expr.op, f);
+        return format_to(ctx.out(),
+                         "({} {} {})",
+                         binary_operation.lhs,
+                         binary_operation.op,
+                         binary_operation.rhs);
+    }
+};
+
+template<>
+struct fmt::formatter<analysis::Expression> : formatter<string_view>
+{
+    template<typename FormatContext>
+    auto format(const analysis::Expression &expr, FormatContext &ctx)
+    {
+        if (std::holds_alternative<analysis::Variable>(expr)) {
+            return format_to(ctx.out(), "{}", std::get<analysis::Variable>(expr));
         }
-        const Element *elem_ptr = std::get<const Element *>(expr.rhs);
-        return format_to(ctx.out(), "{} {} {}", fmt::ptr(expr.lhs), expr.op, fmt::ptr(elem_ptr));
+        if (std::holds_alternative<analysis::BinOp>(expr)) {
+            return format_to(ctx.out(), "{}", std::get<analysis::BinOp>(expr));
+        }
+        throw std::runtime_error("This should never happen");
     }
-};
-
-struct BinOp
-{
-    const Element *lhs;
-    Expression rhs;
 };
 
 template<>
-struct fmt::formatter<BinOp> : formatter<string_view>
+struct fmt::formatter<analysis::Production> : formatter<string_view>
 {
     template<typename FormatContext>
-    auto format(const BinOp &op, FormatContext &ctx)
+    auto format(const analysis::Production &prod, FormatContext &ctx)
     {
-        return format_to(ctx.out(), "{} = {}", fmt::ptr(op.lhs), op.rhs);
+        return format_to(ctx.out(), "{} := {}", prod.lhs, prod.rhs);
     }
 };
+namespace analysis {
 
-struct Element
+struct Problem
 {
-    std::vector<BinOp> *log;
+    std::vector<::BinOp> log{};
 
-    constexpr auto get_id() const { return this; }
-    Expression operator+(const Element &other)
+    Element get_element() { return Element(&log); }
+    void parse(std::span<Element> data, const std::function<std::string(size_t)> &namer)
     {
-        Expression expr;
-        expr.lhs = get_id();
-        expr.op = Operations::ADD;
-        expr.rhs = other.get_id();
-        return expr;
+        std::vector<Production> productions{};
+        std::map<::Element, size_t> tmp_element_to_ix{};
+        auto generate_variable = [&](const ::Element *lhs) -> Variable {
+            if (lhs - data.data() < data.size()) {
+                Variable ret{};
+                ret.type = VariableType::FINAL;
+                ret.index = lhs - data.data();
+                return ret;
+            } else {
+                Variable ret{};
+                ret.type = VariableType::TEMPORARY;
+                ret.index = 0; // TODO: fix
+                return ret;
+            }
+        };
+
+        auto generate_rhs = [&](const ::BinOp &op) -> decltype(Production::rhs) {
+            if (op.rhs.op == Operations::VALUE) {
+                Variable var = generate_variable(op.rhs.lhs);
+                return var;
+            } else {
+                BinOp bin_op;
+                bin_op.lhs = generate_variable(op.rhs.lhs);
+                bin_op.op = op.rhs.op;
+                bin_op.rhs = generate_variable(std::get<const Element *>(op.rhs.rhs));
+                return bin_op;
+            }
+        };
+
+        for (const auto &op : log) {
+            Production production;
+            production.lhs = generate_variable(op.lhs);
+            production.rhs = generate_rhs(op);
+            productions.push_back(production);
+        }
+
+        for (const auto &prod : productions) {
+            fmt::println("{}", prod);
+        }
     }
-
-    Expression operator*(const Element &other)
-    {
-        Expression expr;
-        expr.lhs = get_id();
-        expr.op = Operations::MULTIPLY;
-        expr.rhs = other.get_id();
-        return expr;
-    }
-
-    Expression operator/(const Element &other)
-    {
-        Expression expr;
-        expr.lhs = get_id();
-        expr.op = Operations::DIVIDE;
-        expr.rhs = other.get_id();
-        return expr;
-    }
-
-    Expression operator-(const Element &other)
-    {
-        Expression expr;
-        expr.lhs = get_id();
-        expr.op = Operations::SUBSTRACT;
-        expr.rhs = other.get_id();
-        return expr;
-    }
-
-    Element(std::vector<BinOp> *log_)
-        : log{log_}
-    {}
-
-    Element &operator=(const Expression &expr)
-    {
-        BinOp op;
-        op.lhs = get_id();
-        op.rhs = expr;
-        log->push_back(op);
-        return *this;
-    }
-
-    Expression operator+(const float other)
-    {
-        Expression expr;
-        expr.lhs = get_id();
-        expr.op = Operations::ADD;
-        expr.rhs = other;
-        return expr;
-    }
-
-    Expression operator*(const float other)
-    {
-        Expression expr;
-        expr.lhs = get_id();
-        expr.op = Operations::MULTIPLY;
-        expr.rhs = other;
-        return expr;
-    }
-
-    Expression operator/(const float other)
-    {
-        Expression expr;
-        expr.lhs = get_id();
-        expr.op = Operations::DIVIDE;
-        expr.rhs = other;
-        return expr;
-    }
-
-    Expression operator-(const float other)
-    {
-        Expression expr;
-        expr.lhs = get_id();
-        expr.op = Operations::SUBSTRACT;
-        expr.rhs = other;
-        return expr;
-    }
-
-    // Element(const Element &other) = delete;
-    // Element(Element &&other) = delete;
-    // Element(const ElementInitializer &other)
-    //     : log{other.log}
-    // {}
 };
+
+} // namespace analysis
 
 int main()
 {
-    std::vector<BinOp> log{};
-    std::vector<Element> vec{100, &log};
-    // vec.reserve(100);
-    // for (int i = 0; i < 100; ++i) {
-    //     vec.emplace_back(&log);
-    // }
+    analysis::Problem problem{};
+    // std::vector<Element> vec{100, &log};
 
-    vec[0] = vec[1] + vec[0];
-    vec[1] = vec[1] + 0.1;
+    // vec[0] = vec[1] + vec[0];
+    // vec[1] = vec[1] + 0.1;
 
-    for (auto &v : log) {
+    Matrix<Element> mat{6, 5, problem.get_element()};
+    mat.gaussian_elimination();
+
+    for (auto &v : problem.log) {
         fmt::println("{}", v);
     }
+    fmt::println("##########################");
+    problem.parse(mat.values_, [&](size_t ix) {
+        return fmt::format("{}_{}", ix / mat.width_, ix % mat.width_);
+    });
 }
