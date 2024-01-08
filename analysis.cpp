@@ -1,6 +1,11 @@
 #include <assert.h>
+#include <functional>
+#include <iomanip>
 #include <map>
 #include <span>
+#include <sstream>
+#include <stack>
+#include <unordered_set>
 #include <vector>
 
 #include "Matrix.hpp"
@@ -16,6 +21,101 @@ template<class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
 
 namespace analysis {
+
+struct Graph
+{
+    std::vector<Production> nodes{};
+    std::vector<std::pair<size_t, size_t>> edges{};
+
+    std::string as_dot()
+    {
+        std::string ret;
+        auto inserter = std::back_inserter(ret);
+        fmt::format_to(inserter, "digraph g{{\n");
+        for (const auto [from, to] : edges) {
+            fmt::format_to(inserter, "  {} -> {};\n", from, to);
+        }
+        for (size_t i = 0; i < nodes.size(); ++i) {
+            fmt::format_to(inserter, "  {}[label=\"{}\"];\n", i, nodes.at(i));
+        }
+        fmt::format_to(inserter, "}}");
+        return ret;
+    }
+
+    std::vector<size_t> topological_sort()
+    {
+        std::vector<size_t> sortedNodes;
+        std::vector<bool> visited(nodes.size(), false);
+
+        std::function<void(int)> dfs = [&](int nodeIndex) {
+            visited[nodeIndex] = true;
+
+            for (const auto &edge : edges) {
+                if (edge.first == nodeIndex && !visited[edge.second]) {
+                    dfs(edge.second);
+                }
+            }
+
+            sortedNodes.push_back(nodeIndex);
+        };
+
+        for (int i = 0; i < nodes.size(); ++i) {
+            if (!visited[i]) {
+                dfs(i);
+            }
+        }
+
+        std::reverse(sortedNodes.begin(), sortedNodes.end());
+
+        return sortedNodes;
+    }
+
+    bool hasPath(const size_t startNode, const size_t endNode)
+    {
+        std::unordered_set<size_t> visited;
+        std::stack<size_t> stack;
+        stack.push(startNode);
+
+        while (!stack.empty()) {
+            size_t currentNode = stack.top();
+            stack.pop();
+
+            if (currentNode == endNode) {
+                return true;
+            }
+
+            visited.insert(currentNode);
+
+            for (const auto &edge : edges) {
+                if (edge.first == currentNode && !visited.contains(edge.second)) {
+                    stack.push(edge.second);
+                }
+            }
+        }
+
+        return false;
+    }
+
+    Graph transitive_reduction()
+    {
+        Graph ret{};
+        ret.nodes = this->nodes;
+        std::vector<size_t> t = topological_sort();
+
+        for (int i = 0; i < t.size(); ++i) {
+            for (int j = t.size() - 1; j >= 0; --j) {
+                const std::pair<size_t, size_t> edge{t[j], t[i]};
+                if (std::ranges::find(edges, edge) != edges.end()) {
+                    if (!ret.hasPath(edge.first, edge.second)) {
+                        ret.edges.push_back(edge);
+                    }
+                }
+            }
+        }
+
+        return ret;
+    }
+};
 
 struct Problem
 {
@@ -121,9 +221,11 @@ struct Problem
         }
 
         produce_relations();
-        print_relations();
+        // print_relations();
         produce_FNF();
         printFNF();
+
+        Graph graph = produce_dependence_graph();
     }
 
     using RelationT = std::vector<std::pair<size_t, size_t>>;
@@ -289,9 +391,49 @@ struct Problem
             interpret_production(prod, data, temporary_variables);
         }
     }
+
+    Graph produce_dependence_graph()
+    {
+        Graph ret{};
+        ret.nodes = productions;
+
+        for (int a_ix = 0; a_ix < ret.nodes.size(); ++a_ix) {
+            const Production &a = ret.nodes.at(a_ix);
+            for (int b_ix = a_ix + 1; b_ix < ret.nodes.size(); ++b_ix) {
+                const Production &b = ret.nodes.at(b_ix);
+                if (a.is_dependent(b)) {
+                    ret.edges.push_back({a_ix, b_ix});
+                }
+            }
+        }
+
+        return ret;
+    }
 };
 
 } // namespace analysis
+
+std::string url_encode(const std::string &value)
+{
+    std::ostringstream escaped;
+    escaped.fill('0');
+    escaped << std::hex;
+
+    for (char c : value) {
+        // Keep alphanumeric and other accepted characters intact
+        if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+            escaped << c;
+            continue;
+        }
+
+        // Any other characters are percent-encoded
+        escaped << std::uppercase;
+        escaped << '%' << std::setw(2) << int((unsigned char) c);
+        escaped << std::nouppercase;
+    }
+
+    return escaped.str();
+}
 
 constexpr Matrix<float> generate_matrix()
 {
@@ -337,7 +479,7 @@ void test_with_matrix()
     // vec[1] = vec[1] + 0.1;
 
     Matrix<trace::Variable> mat{6, 5, problem.get_element()};
-    // problem.log.clear();
+    problem.log.clear();
     mat.gaussian_elimination();
 
     for (auto &v : problem.log) {
@@ -345,6 +487,11 @@ void test_with_matrix()
     }
     fmt::println("##########################");
     problem.parse(mat.values_);
+
+    fmt::println("Graph: ");
+    auto graph = problem.produce_dependence_graph();
+    std::string dot = graph.transitive_reduction().as_dot();
+    fmt::println("{}", graph.transitive_reduction().as_dot());
 }
 
 void simple_test()
@@ -364,6 +511,6 @@ void simple_test()
 int main()
 {
     // test_implementation();
-    // test_with_matrix();
-    simple_test();
+    test_with_matrix();
+    // simple_test();
 }
