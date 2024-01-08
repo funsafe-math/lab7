@@ -14,6 +14,7 @@ struct TemporaryVariable
         : number{number_}
     {}
     float interpret(std::span<float> temps) const { return temps[number]; }
+    auto operator<=>(const TemporaryVariable &) const = default;
 };
 
 struct FinalVariable
@@ -24,6 +25,7 @@ struct FinalVariable
     {}
 
     float interpret(std::span<float> finals) const { return finals[index]; }
+    auto operator<=>(const FinalVariable &) const = default;
 };
 
 struct LiteralVariable
@@ -33,11 +35,16 @@ struct LiteralVariable
         : value{value_}
     {}
     float interpret() const { return value; }
+    auto operator<=>(const LiteralVariable &) const = default;
 };
+
+// You cant have literalVariable on production lhs
+using WritableVariable = std::variant<TemporaryVariable, FinalVariable>;
 
 struct Variable : public std::variant<TemporaryVariable, FinalVariable, LiteralVariable>
 {
     using std::variant<TemporaryVariable, FinalVariable, LiteralVariable>::variant;
+    auto operator<=>(const Variable &) const = default;
     float interpret(std::span<float> finals, std::span<float> temps) const
     {
         return std::visit(
@@ -52,10 +59,49 @@ struct Variable : public std::variant<TemporaryVariable, FinalVariable, LiteralV
             },
             *this);
     }
-};
 
-// You cant have literalVariable on production lhs
-using WritableVariable = std::variant<TemporaryVariable, FinalVariable>;
+    bool operator==(const TemporaryVariable w) const
+    {
+        return std::visit(
+            [&](auto x) -> bool {
+                using T = std::decay_t<decltype(x)>;
+                if constexpr (std::is_same_v<T, TemporaryVariable>)
+                    return x == w;
+                if constexpr (std::is_same_v<T, FinalVariable>)
+                    return false;
+                if constexpr (std::is_same_v<T, LiteralVariable>)
+                    return false;
+            },
+            *this);
+    }
+    bool operator==(const FinalVariable w) const
+    {
+        return std::visit(
+            [&](auto x) -> bool {
+                using T = std::decay_t<decltype(x)>;
+                if constexpr (std::is_same_v<T, TemporaryVariable>)
+                    return false;
+                if constexpr (std::is_same_v<T, FinalVariable>)
+                    return x == w;
+                if constexpr (std::is_same_v<T, LiteralVariable>)
+                    return false;
+            },
+            *this);
+    }
+
+    bool operator==(const WritableVariable w) const
+    {
+        return std::visit(
+            [&](auto x) -> bool {
+                using T = std::decay_t<decltype(x)>;
+                if constexpr (std::is_same_v<T, TemporaryVariable>)
+                    return *this == x;
+                if constexpr (std::is_same_v<T, FinalVariable>)
+                    return *this == x;
+            },
+            w);
+    }
+};
 
 struct BinOp
 {
@@ -80,6 +126,10 @@ struct BinOp
             return -interpret(lhs);
         }
     }
+
+    bool contains(const WritableVariable w) const { return lhs == w || rhs == w; }
+
+    auto operator<=>(const BinOp &) const = default;
 };
 
 struct UnaryOp
@@ -104,6 +154,10 @@ struct UnaryOp
             return -interpret(var);
         }
     }
+
+    bool contains(const WritableVariable w) { return var == w; }
+
+    auto operator<=>(const UnaryOp &) const = default;
 };
 
 struct Expression : public std::variant<Variable, BinOp, UnaryOp>
@@ -124,6 +178,22 @@ struct Expression : public std::variant<Variable, BinOp, UnaryOp>
             },
             *this);
     }
+    bool contains(const WritableVariable &w) const
+    {
+        return std::visit(
+            [&](auto x) -> float {
+                using T = std::decay_t<decltype(x)>;
+                if constexpr (std::is_same_v<T, Variable>)
+                    return x == w;
+                if constexpr (std::is_same_v<T, BinOp>)
+                    return x.contains(w);
+                if constexpr (std::is_same_v<T, UnaryOp>)
+                    return x.contains(w);
+            },
+            *this);
+    }
+
+    auto operator<=>(const Expression &) const = default;
 };
 
 struct Production
@@ -134,6 +204,12 @@ struct Production
         : lhs{lhs_}
         , rhs{rhs_}
     {}
+
+    bool is_dependent(const Production &other) const
+    {
+        return lhs == other.lhs || this->rhs.contains(other.lhs) || other.rhs.contains(this->lhs);
+    }
+    auto operator<=>(const Production &) const = default;
 };
 
 } // namespace analysis

@@ -117,6 +117,50 @@ struct Problem
         for (const Production &prod : productions) {
             fmt::println("{}", prod);
         }
+
+        produce_relations();
+        print_relations();
+        produce_FNF();
+    }
+
+    using RelationT = std::vector<std::pair<size_t, size_t>>;
+
+    RelationT D{};
+    RelationT I{};
+
+    void produce_relations()
+    {
+        for (size_t a_ix = 0; a_ix < productions.size(); ++a_ix) {
+            const Production &a = productions.at(a_ix);
+            for (size_t b_ix = a_ix; b_ix < productions.size(); ++b_ix) {
+                const Production &b = productions.at(b_ix);
+                if (a.is_dependent(b)) {
+                    D.emplace_back(a_ix, b_ix);
+                } else {
+                    I.emplace_back(a_ix, b_ix);
+                }
+            }
+        }
+    }
+
+    void print_relations() const
+    {
+        auto print_arr = [&](const RelationT &set) {
+            for (const auto [a_ix, b_ix] : set) {
+                if (productions.at(a_ix) == productions.at(b_ix)) {
+                    continue;
+                }
+                fmt::println("{{ {},\t{} }}", productions.at(a_ix), productions.at(b_ix));
+            }
+        };
+        fmt::println("Dependent (identity and swapped skipped):");
+        print_arr(D);
+        fmt::println("Independent:");
+        print_arr(I);
+    }
+    void produce_FNF()
+    {
+        // TODO: implement
     }
 
     static void interpret_production(const Production &prod,
@@ -137,15 +181,8 @@ struct Problem
 
         float &lhs = parse_lhs(prod.lhs);
         lhs = prod.rhs.interpret(data, temporary_variables);
-
-        // std::visit(
-        //     [&](const auto x) {
-        //         using T = std::decay_t<decltype(x)>;
-        //         if constexpr (std::is_same_v<T, Variable>)
-        //             return temporary_variables[x.number];
-        //     },
-        //     prod.rhs);
     }
+
     // Only for testing purposes
     void interpret(std::span<float> data) const
     {
@@ -226,6 +263,7 @@ void simple_test()
 {
     analysis::Problem problem{};
     std::vector<trace::Variable> vec{10, problem.get_element()};
+    problem.log.clear();
     vec[0] += vec[1] + vec[2] * 2;
 
     problem.parse(vec);
@@ -233,7 +271,7 @@ void simple_test()
 
 int main()
 {
-    test_implementation();
+    // test_implementation();
     // test_with_matrix();
-    // simple_test();
+    simple_test();
 }
