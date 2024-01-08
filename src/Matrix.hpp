@@ -32,6 +32,7 @@ struct Matrix
     {
         int up_to = std::min(width_, height_);
 
+        // Create triangular matrix
         for (size_t column_ix = 0; column_ix < up_to; column_ix++) {
             for (size_t row_ix = column_ix + 1; row_ix < up_to; row_ix++) {
                 T m = row(row_ix)[column_ix] / row(column_ix)[column_ix];
@@ -40,8 +41,23 @@ struct Matrix
                 }
             }
         }
-    }
 
+        // Create diagonal normalized matrix
+
+        for (size_t row_ix = height_ - 1; row_ix < height_; row_ix--) {
+            for (int column_ix = row_ix + 1; column_ix < height_; ++column_ix) {
+                T x = row(row_ix)[column_ix];
+                for (size_t i = column_ix; i < width_; i++) {
+                    row(row_ix)[i] -= x * row(column_ix)[i];
+                }
+            }
+
+            T m = row(row_ix)[row_ix];
+            for (size_t i = row_ix; i < width_; i++) {
+                row(row_ix)[i] /= m;
+            }
+        }
+    }
 };
 
 template<typename T>

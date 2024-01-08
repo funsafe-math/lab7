@@ -10,32 +10,32 @@ namespace analysis {
 struct TemporaryVariable
 {
     size_t number;
-    TemporaryVariable(size_t number_)
+    constexpr TemporaryVariable(size_t number_)
         : number{number_}
     {}
-    float interpret(std::span<float> temps) const { return temps[number]; }
-    auto operator<=>(const TemporaryVariable &) const = default;
+    constexpr float interpret(std::span<float> temps) const { return temps[number]; }
+    constexpr auto operator<=>(const TemporaryVariable &) const = default;
 };
 
 struct FinalVariable
 {
     std::ptrdiff_t index;
-    FinalVariable(std::ptrdiff_t index_)
+    constexpr FinalVariable(std::ptrdiff_t index_)
         : index{index_}
     {}
 
-    float interpret(std::span<float> finals) const { return finals[index]; }
-    auto operator<=>(const FinalVariable &) const = default;
+    constexpr float interpret(std::span<float> finals) const { return finals[index]; }
+    constexpr auto operator<=>(const FinalVariable &) const = default;
 };
 
 struct LiteralVariable
 {
     float value;
-    LiteralVariable(float value_)
+    constexpr LiteralVariable(float value_)
         : value{value_}
     {}
-    float interpret() const { return value; }
-    auto operator<=>(const LiteralVariable &) const = default;
+    constexpr float interpret() const { return value; }
+    constexpr auto operator<=>(const LiteralVariable &) const = default;
 };
 
 // You cant have literalVariable on production lhs
@@ -44,8 +44,8 @@ using WritableVariable = std::variant<TemporaryVariable, FinalVariable>;
 struct Variable : public std::variant<TemporaryVariable, FinalVariable, LiteralVariable>
 {
     using std::variant<TemporaryVariable, FinalVariable, LiteralVariable>::variant;
-    auto operator<=>(const Variable &) const = default;
-    float interpret(std::span<float> finals, std::span<float> temps) const
+    constexpr auto operator<=>(const Variable &) const = default;
+    constexpr float interpret(std::span<float> finals, std::span<float> temps) const
     {
         return std::visit(
             [&](auto x) -> float {
@@ -60,7 +60,7 @@ struct Variable : public std::variant<TemporaryVariable, FinalVariable, LiteralV
             *this);
     }
 
-    bool operator==(const TemporaryVariable w) const
+    constexpr bool operator==(const TemporaryVariable w) const
     {
         return std::visit(
             [&](auto x) -> bool {
@@ -74,7 +74,7 @@ struct Variable : public std::variant<TemporaryVariable, FinalVariable, LiteralV
             },
             *this);
     }
-    bool operator==(const FinalVariable w) const
+    constexpr bool operator==(const FinalVariable w) const
     {
         return std::visit(
             [&](auto x) -> bool {
@@ -89,7 +89,7 @@ struct Variable : public std::variant<TemporaryVariable, FinalVariable, LiteralV
             *this);
     }
 
-    bool operator==(const WritableVariable w) const
+    constexpr bool operator==(const WritableVariable w) const
     {
         return std::visit(
             [&](auto x) -> bool {
@@ -108,7 +108,7 @@ struct BinOp
     Variable lhs;
     Variable rhs;
     trace::Operations op;
-    float interpret(std::span<float> finals, std::span<float> temps) const
+    constexpr float interpret(std::span<float> finals, std::span<float> temps) const
     {
         auto interpret = [&](Variable var) { return var.interpret(finals, temps); };
         switch (op) {
@@ -127,16 +127,16 @@ struct BinOp
         }
     }
 
-    bool contains(const WritableVariable w) const { return lhs == w || rhs == w; }
+    constexpr bool contains(const WritableVariable w) const { return lhs == w || rhs == w; }
 
-    auto operator<=>(const BinOp &) const = default;
+    constexpr auto operator<=>(const BinOp &) const = default;
 };
 
 struct UnaryOp
 {
     Variable var;
     trace::Operations op; // must be a unary operation
-    float interpret(std::span<float> finals, std::span<float> temps) const
+    constexpr float interpret(std::span<float> finals, std::span<float> temps) const
     {
         auto interpret = [&](Variable var) { return var.interpret(finals, temps); };
         switch (op) {
@@ -155,9 +155,9 @@ struct UnaryOp
         }
     }
 
-    bool contains(const WritableVariable w) { return var == w; }
+    constexpr bool contains(const WritableVariable w) { return var == w; }
 
-    auto operator<=>(const UnaryOp &) const = default;
+    constexpr auto operator<=>(const UnaryOp &) const = default;
 };
 
 struct Expression : public std::variant<Variable, BinOp, UnaryOp>
@@ -178,7 +178,7 @@ struct Expression : public std::variant<Variable, BinOp, UnaryOp>
             },
             *this);
     }
-    bool contains(const WritableVariable &w) const
+    constexpr bool contains(const WritableVariable &w) const
     {
         return std::visit(
             [&](auto x) -> float {
@@ -200,16 +200,16 @@ struct Production
 {
     WritableVariable lhs;
     Expression rhs;
-    Production(const WritableVariable &lhs_, const Expression &rhs_)
+    constexpr Production(const WritableVariable &lhs_, const Expression &rhs_)
         : lhs{lhs_}
         , rhs{rhs_}
     {}
 
-    bool is_dependent(const Production &other) const
+    constexpr bool is_dependent(const Production &other) const
     {
         return lhs == other.lhs || this->rhs.contains(other.lhs) || other.rhs.contains(this->lhs);
     }
-    auto operator<=>(const Production &) const = default;
+    constexpr auto operator<=>(const Production &) const = default;
 };
 
 } // namespace analysis

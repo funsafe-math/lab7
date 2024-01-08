@@ -12,8 +12,13 @@ int main(int argc, char *argv[])
     Matrix<float> input = from_file(argv[1]);
     Matrix<float> correct_output = from_file(argv[2]);
 
-    print_matrix(input);
     input.gaussian_elimination();
+
+    fmt::println("Ours:");
+    print_matrix(input);
+
+    fmt::println("Correct:");
+    print_matrix(correct_output);
     // print_matrix(input);
 
     fmt::println("Ours:    {}", input.values_);
