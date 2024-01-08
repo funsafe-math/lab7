@@ -22,28 +22,38 @@ FetchContent_MakeAvailable(blaze)
 find_package(blaze)
 
 add_executable(lab7
-    main.cpp
+    src/main.cpp
 )
 
 add_executable(lab7_2
-    main2.cpp
-    Expression.hpp
-    Matrix.hpp
+   src/main2.cpp
+   src/Expression.hpp
+   src/Matrix.hpp
 )
 
 add_executable(tracing
-    trace.hpp
-    trace.cpp
+   src/trace.hpp
+   src/trace.cpp
 )
 
 add_executable(analysis
-    analysis.hpp
-    analysis.cpp
+   src/analysis.hpp
+   src/analysis.cpp
+
+   src/graph.hpp
+   src/graph.cpp
 )
+
+add_executable(simple_elimination_test
+    test/simple_elimination_test.cpp
+    src/Matrix.hpp
+)
+
+target_link_libraries(simple_elimination_test fmt::fmt)
 
 find_package(OpenMP)
 add_executable(mm1
-    mm1.c
+    mm/mm1.c
 )
 target_link_libraries(mm1 PUBLIC OpenMP::OpenMP_CXX)
 
@@ -57,4 +67,10 @@ include(GNUInstallDirs)
 install(TARGETS lab7
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+enable_testing()
+add_test(
+  NAME simple_elimination_test
+  COMMAND $<TARGET_FILE:simple_elimination_test> ${CMAKE_CURRENT_LIST_DIR}/in.txt ${CMAKE_CURRENT_LIST_DIR}/out.txt
 )

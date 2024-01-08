@@ -4,6 +4,8 @@
 #include "fmt/ranges.h"
 
 #include <cstddef>
+#include <fstream>
+#include <iostream>
 #include <span>
 #include <vector>
 
@@ -39,13 +41,39 @@ struct Matrix
             }
         }
     }
+
 };
 
 template<typename T>
 void print_matrix(Matrix<T> &mat)
 {
     for (size_t i = 0; i < mat.height_; ++i) {
-        // fmt::println("{::+4.2f}", mat[i]);
         fmt::println("{:: 04.2f}", mat[i]);
     }
+}
+
+static Matrix<float> from_file(const char *filename)
+{
+    std::ifstream file{filename};
+    if (!file.is_open()) {
+        throw std::runtime_error("Failed to open file");
+    }
+    size_t size;
+    file >> size;
+    std::cout << "Matrix size is " << size << '\n';
+    auto width_ = size + 1;
+    auto height_ = size;
+    Matrix<float> ret{width_, height_, float{}};
+    for (int i = 0; i < size; ++i) {
+        for (int j = 0; j < size; ++j) {
+            file >> ret[i][j];
+        }
+    }
+
+    for (int i = 0; i < size; ++i) {
+        file >> ret[i][size];
+    }
+
+    file.close();
+    return ret;
 }

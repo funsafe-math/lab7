@@ -103,11 +103,11 @@ struct Variable
 {
     std::vector<Production> *log;
 
-    Variable(std::vector<Production> *log_)
+    inline Variable(std::vector<Production> *log_)
         : log{log_}
     {}
 
-    Variable(const VariableExpression &expr)
+    inline Variable(const VariableExpression &expr)
         : log{expr.log}
     {
         Production prod;
@@ -118,60 +118,60 @@ struct Variable
 
     // Arithmetic operators with self
 
-    VariableExpression operator+(const Variable &other) const
+    inline VariableExpression operator+(const Variable &other) const
     {
         return {get_id(), other.get_id(), Operations::ADD, log};
     }
 
-    VariableExpression operator-(const Variable &other) const
+    inline VariableExpression operator-(const Variable &other) const
     {
         return {get_id(), other.get_id(), Operations::SUBSTRACT, log};
     }
 
-    VariableExpression operator*(const Variable &other) const
+    inline VariableExpression operator*(const Variable &other) const
     {
         return {get_id(), other.get_id(), Operations::MULTIPLY, log};
     }
 
-    VariableExpression operator/(const Variable &other) const
+    inline VariableExpression operator/(const Variable &other) const
     {
         return {get_id(), other.get_id(), Operations::DIVIDE, log};
     }
 
     // Unary operators with self
-    VariableExpression operator-() const
+    inline VariableExpression operator-() const
     {
         return VariableExpression::makeUnaryOp(get_id(), Operations::UNARY_SUBSTRACT, log);
     }
 
-    const Variable &operator+() const { return *this; }
+    inline const Variable &operator+() const { return *this; }
 
     // Arithmetic operators with float
     // TODO: template this
 
-    VariableExpression operator+(const float other) const
+    inline VariableExpression operator+(const float other) const
     {
         return {get_id(), other, Operations::ADD, log};
     }
 
-    VariableExpression operator-(const float other) const
+    inline VariableExpression operator-(const float other) const
     {
         return {get_id(), other, Operations::SUBSTRACT, log};
     }
 
-    VariableExpression operator*(const float other) const
+    inline VariableExpression operator*(const float other) const
     {
         return {get_id(), other, Operations::MULTIPLY, log};
     }
 
-    VariableExpression operator/(const float other) const
+    inline VariableExpression operator/(const float other) const
     {
         return {get_id(), other, Operations::DIVIDE, log};
     }
 
     // Assignment operators
 
-    Variable &operator=(const VariableExpression &expr)
+    inline Variable &operator=(const VariableExpression &expr)
     {
         Production prod;
         prod.lhs = get_id();
@@ -180,7 +180,7 @@ struct Variable
         return *this;
     }
 
-    Variable &operator=(const float val)
+    inline Variable &operator=(const float val)
     {
         Production prod;
         prod.lhs = get_id();
@@ -189,7 +189,7 @@ struct Variable
         return *this;
     }
 
-    Variable &operator+=(const VariableExpression &expr)
+    inline Variable &operator+=(const VariableExpression &expr)
     {
         Variable tmp = expr;
         *this = *this + tmp;
@@ -197,21 +197,21 @@ struct Variable
         return *this;
     }
 
-    Variable &operator-=(const VariableExpression &expr)
+    inline Variable &operator-=(const VariableExpression &expr)
     {
         Variable tmp = expr;
         *this = *this - tmp;
         return *this;
     }
 
-    Variable &operator*=(const VariableExpression &expr)
+    inline Variable &operator*=(const VariableExpression &expr)
     {
         Variable tmp = expr;
         *this = *this * tmp;
         return *this;
     }
 
-    Variable &operator/=(const VariableExpression &expr)
+    inline Variable &operator/=(const VariableExpression &expr)
     {
         Variable tmp = expr;
         *this = *this / tmp;
@@ -219,33 +219,33 @@ struct Variable
     }
 
     // Assignment operators with float
-    Variable &operator+=(const float val)
+    inline Variable &operator+=(const float val)
     {
         VariableExpression tmp = *this + val;
         *this = tmp;
         return *this;
     }
 
-    Variable &operator-=(const float val)
+    inline Variable &operator-=(const float val)
     {
         VariableExpression tmp = *this - val;
         *this = tmp;
         return *this;
     }
-    Variable &operator*=(const float val)
+    inline Variable &operator*=(const float val)
     {
         VariableExpression tmp = *this * val;
         *this = tmp;
         return *this;
     }
-    Variable &operator/=(const float val)
+    inline Variable &operator/=(const float val)
     {
         VariableExpression tmp = *this / val;
         *this = tmp;
         return *this;
     }
 
-    Variable(const Variable &other)
+    inline Variable(const Variable &other)
         : log{other.log}
     {
         Production p;
@@ -255,85 +255,85 @@ struct Variable
         log->push_back(p);
     };
     Variable(Variable &&other) = delete;
-    ~Variable() {}
+    inline ~Variable() {}
 
 private:
-    Variable create_without_logging() const { return Variable{this->log}; }
+    inline Variable create_without_logging() const { return Variable{this->log}; }
     constexpr const Variable *get_id() const { return this; }
 };
 
-VariableExpression operator+(float lhs, const Variable &rhs)
+inline VariableExpression operator+(float lhs, const Variable &rhs)
 {
     return {lhs, &rhs, Operations::ADD, rhs.log};
 }
 
-VariableExpression operator-(float lhs, const Variable &rhs)
+inline VariableExpression operator-(float lhs, const Variable &rhs)
 {
     return {lhs, &rhs, Operations::SUBSTRACT, rhs.log};
 }
-VariableExpression operator*(float lhs, const Variable &rhs)
+inline VariableExpression operator*(float lhs, const Variable &rhs)
 {
     return {lhs, &rhs, Operations::MULTIPLY, rhs.log};
 }
-VariableExpression operator/(float lhs, const Variable &rhs)
+inline VariableExpression operator/(float lhs, const Variable &rhs)
 {
     return {lhs, &rhs, Operations::DIVIDE, rhs.log};
 }
 
 // Experimental: Expression-Variable operators allowing for ex. v0 = v1 + v2 * 2;
-VariableExpression operator+(const Variable &lhs, const VariableExpression &rhs)
+inline VariableExpression operator+(const Variable &lhs, const VariableExpression &rhs)
 {
     Variable tmp = rhs;
     return lhs + tmp;
 }
 
-VariableExpression operator-(const Variable &lhs, const VariableExpression &rhs)
+inline VariableExpression operator-(const Variable &lhs, const VariableExpression &rhs)
 {
     Variable tmp = rhs;
     return lhs + tmp;
 }
-VariableExpression operator*(const Variable &lhs, const VariableExpression &rhs)
+inline VariableExpression operator*(const Variable &lhs, const VariableExpression &rhs)
 {
     Variable tmp = rhs;
     return lhs + tmp;
 }
-VariableExpression operator/(const Variable &lhs, const VariableExpression &rhs)
+inline VariableExpression operator/(const Variable &lhs, const VariableExpression &rhs)
 {
     Variable tmp = rhs;
     return lhs + tmp;
 }
 
-VariableExpression operator+(const VariableExpression &lhs, const Variable &rhs)
+inline VariableExpression operator+(const VariableExpression &lhs, const Variable &rhs)
 {
     Variable tmp = rhs;
     return tmp + rhs;
 }
 
-VariableExpression operator+(const VariableExpression &lhs, float rhs)
+inline VariableExpression operator+(const VariableExpression &lhs, float rhs)
 {
     Variable tmp = lhs;
     return tmp + rhs;
 }
 
-VariableExpression operator-(const VariableExpression &lhs, float rhs)
+inline VariableExpression operator-(const VariableExpression &lhs, float rhs)
 {
     Variable tmp = lhs;
     return tmp - rhs;
 }
 
-VariableExpression operator*(const VariableExpression &lhs, float rhs)
+inline VariableExpression operator*(const VariableExpression &lhs, float rhs)
 {
     Variable tmp = lhs;
     return tmp * rhs;
 }
 
-VariableExpression operator/(const VariableExpression &lhs, float rhs)
+inline VariableExpression operator/(const VariableExpression &lhs, float rhs)
 {
     Variable tmp = lhs;
     return tmp / rhs;
 }
 
-VariableExpression operator-(const VariableExpression &operand)
+inline VariableExpression operator-(const VariableExpression &operand)
 {
     Variable tmp = operand;
     return -tmp;
