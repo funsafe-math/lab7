@@ -1,6 +1,8 @@
 #pragma once
 
 #include "fmt/core.h"
+#include "fmt/ranges.h"
+
 #include <cstddef>
 #include <span>
 #include <vector>
@@ -42,7 +44,6 @@ struct Matrix
 template<typename T>
 void print_matrix(Matrix<T> &mat)
 {
-    fmt::println("Matrix:");
     for (size_t i = 0; i < mat.height_; ++i) {
         fmt::println("{}", mat[i]);
     }

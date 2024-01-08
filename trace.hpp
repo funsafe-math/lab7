@@ -32,11 +32,11 @@ struct Variable;
 struct Expression // Binary or unary operation
 {
     Operations op;
-    std::variant<std::monostate, const Variable *, float> lhs; // Used to store literal values
-    std::variant<std::monostate, const Variable *, float> rhs;
+    std::variant<const Variable *, float> lhs; // Used to store literal values
+    std::variant<const Variable *, float> rhs;
 
-    Expression(std::variant<std::monostate, const Variable *, float> lhs_,
-               std::variant<std::monostate, const Variable *, float> rhs_,
+    Expression(std::variant<const Variable *, float> lhs_,
+               std::variant<const Variable *, float> rhs_,
                Operations op_)
         : op{op_}
         , lhs{lhs_}
@@ -81,8 +81,8 @@ struct VariableExpression : public Expression
     std::vector<Production> *log;
 
     VariableExpression() = delete;
-    VariableExpression(std::variant<std::monostate, const Variable *, float> lhs_,
-                       std::variant<std::monostate, const Variable *, float> rhs_,
+    VariableExpression(std::variant<const Variable *, float> lhs_,
+                       std::variant<const Variable *, float> rhs_,
                        Operations op_,
                        std::vector<Production> *log_)
         : Expression(lhs_, rhs_, op_)
@@ -345,12 +345,10 @@ struct fmt::formatter<trace::Operations> : formatter<string_view>
 };
 
 template<>
-struct fmt::formatter<std::variant<std::monostate, const trace::Variable *, float>>
-    : formatter<string_view>
+struct fmt::formatter<std::variant<const trace::Variable *, float>> : formatter<string_view>
 {
     template<typename FormatContext>
-    auto format(const std::variant<std::monostate, const trace::Variable *, float> &var,
-                FormatContext &ctx)
+    auto format(const std::variant<const trace::Variable *, float> &var, FormatContext &ctx)
     {
         if (std::holds_alternative<const trace::Variable *>(var)) {
             return format_to(ctx.out(), "{}", fmt::ptr(std::get<const trace::Variable *>(var)));
