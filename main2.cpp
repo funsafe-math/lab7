@@ -27,7 +27,7 @@ struct BinOp
 {
     Variable lhs;
     Variable rhs;
-    Operations op;
+    trace::Operations op;
 };
 
 using Expression = std::variant<Variable, BinOp>;
@@ -56,6 +56,9 @@ struct fmt::formatter<analysis::VariableType> : formatter<string_view>
             break;
         case analysis::VariableType::FINAL:
             name = "final";
+            break;
+        case analysis::VariableType::LITERAL:
+            name = "literal";
             break;
         }
         return formatter<string_view>::format(name, ctx);
@@ -115,15 +118,19 @@ namespace analysis {
 
 struct Problem
 {
-    std::vector<::BinOp> log{};
+    std::vector<trace::BinOp> log{};
 
-    Element get_element() { return Element(&log); }
-    void parse(std::span<Element> data, const std::function<std::string(size_t)> &namer)
+    trace::Element get_element() { return trace::Element(&log); }
+    void parse(std::span<trace::Element> data)
     {
         std::vector<Production> productions{};
-        std::map<::Element, size_t> tmp_element_to_ix{};
-        auto generate_variable = [&](const ::Element *lhs) -> Variable {
-            if (lhs - data.data() < data.size()) {
+        std::map<const trace::Element *, size_t> tmp_element_to_ix{};
+        size_t biggest_tmp_ix = 0;
+        auto is_final = [&](const trace::Element *lhs) -> bool {
+            return (lhs >= data.data() && ((lhs - data.data()) < data.size()));
+        };
+        auto generate_variable = [&](const trace::Element *lhs) -> Variable {
+            if (is_final(lhs)) {
                 Variable ret{};
                 ret.type = VariableType::FINAL;
                 ret.index = lhs - data.data();
@@ -132,24 +139,38 @@ struct Problem
                 Variable ret{};
                 ret.type = VariableType::TEMPORARY;
                 ret.index = 0; // TODO: fix
+                if (tmp_element_to_ix.contains(lhs)) {
+                    ret.index = tmp_element_to_ix.at(lhs);
+                } else {
+                    ret.index = biggest_tmp_ix;
+                    tmp_element_to_ix[lhs] = biggest_tmp_ix++;
+                }
+
                 return ret;
             }
         };
 
-        auto generate_rhs = [&](const ::BinOp &op) -> decltype(Production::rhs) {
-            if (op.rhs.op == Operations::VALUE) {
+        auto generate_rhs = [&](const trace::BinOp &op) -> decltype(Production::rhs) {
+            if (op.rhs.op == trace::Operations::VALUE) {
                 Variable var = generate_variable(op.rhs.lhs);
                 return var;
             } else {
                 BinOp bin_op;
                 bin_op.lhs = generate_variable(op.rhs.lhs);
                 bin_op.op = op.rhs.op;
-                bin_op.rhs = generate_variable(std::get<const Element *>(op.rhs.rhs));
+                bin_op.rhs = generate_variable(std::get<const trace::Element *>(op.rhs.rhs));
                 return bin_op;
             }
         };
 
+        productions.reserve(log.size());
         for (const auto &op : log) {
+            if (op.rhs.op == trace::Operations::DESTROY) {
+                if (!is_final(op.lhs) && tmp_element_to_ix.contains(op.lhs)) {
+                    tmp_element_to_ix.at(op.lhs) = biggest_tmp_ix++;
+                }
+                continue;
+            }
             Production production;
             production.lhs = generate_variable(op.lhs);
             production.rhs = generate_rhs(op);
@@ -164,7 +185,7 @@ struct Problem
 
 } // namespace analysis
 
-int main()
+void test_with_matrix()
 {
     analysis::Problem problem{};
     // std::vector<Element> vec{100, &log};
@@ -172,14 +193,28 @@ int main()
     // vec[0] = vec[1] + vec[0];
     // vec[1] = vec[1] + 0.1;
 
-    Matrix<Element> mat{6, 5, problem.get_element()};
+    Matrix<trace::Element> mat{6, 5, problem.get_element()};
+    problem.log.clear();
     mat.gaussian_elimination();
 
     for (auto &v : problem.log) {
         fmt::println("{}", v);
     }
     fmt::println("##########################");
-    problem.parse(mat.values_, [&](size_t ix) {
-        return fmt::format("{}_{}", ix / mat.width_, ix % mat.width_);
-    });
+    problem.parse(mat.values_);
+}
+
+void simple_test()
+{
+    analysis::Problem problem{};
+    std::vector<trace::Element> vec{10, problem.get_element()};
+    vec[0] += vec[1] + vec[2];
+
+    problem.parse(vec);
+}
+
+int main()
+{
+    // test_with_matrix();
+    simple_test();
 }

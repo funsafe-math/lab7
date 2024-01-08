@@ -30,6 +30,12 @@ add_executable(lab7_2
     Expression.hpp
     Matrix.hpp
 )
+
+add_executable(analyzer
+    trace.hpp
+    trace.cpp
+
+)
 find_package(OpenMP)
 add_executable(mm1
     mm1.c
@@ -37,6 +43,7 @@ add_executable(mm1
 target_link_libraries(mm1 PUBLIC OpenMP::OpenMP_CXX)
 
 target_link_libraries(lab7 fmt::fmt)
+target_link_libraries(analyzer fmt::fmt -fsanitize=address)
 target_link_libraries(lab7_2 fmt::fmt blaze::blaze)
 
 include(GNUInstallDirs)
