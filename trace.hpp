@@ -21,6 +21,8 @@
  * - When running on a platform supporting SIMD (like modern x86), in a foata layer, group tasks to use SIMD functionality
  * 
  * Look at https://godbolt.org/z/zdEE3fr7o
+ * 
+ * Test idea: execute sequentially shuffling productions in each foata group
 */
 
 namespace trace {
@@ -213,6 +215,33 @@ struct Variable
     {
         Variable tmp = expr;
         *this = *this / tmp;
+        return *this;
+    }
+
+    // Assignment operators with float
+    Variable &operator+=(const float val)
+    {
+        VariableExpression tmp = *this + val;
+        *this = tmp;
+        return *this;
+    }
+
+    Variable &operator-=(const float val)
+    {
+        VariableExpression tmp = *this - val;
+        *this = tmp;
+        return *this;
+    }
+    Variable &operator*=(const float val)
+    {
+        VariableExpression tmp = *this * val;
+        *this = tmp;
+        return *this;
+    }
+    Variable &operator/=(const float val)
+    {
+        VariableExpression tmp = *this / val;
+        *this = tmp;
         return *this;
     }
 

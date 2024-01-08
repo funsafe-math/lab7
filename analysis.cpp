@@ -1,5 +1,7 @@
+#include <assert.h>
 #include <map>
 #include <span>
+#include <vector>
 
 #include "Matrix.hpp"
 #include "analysis.hpp"
@@ -67,7 +69,7 @@ struct Problem
         };
 
         auto generate_variable_from_variant =
-            [&](const std::variant<const trace::Variable *, float> &var) -> Variable {
+            [&](const std::variant<const trace::Variable *, float> var) -> Variable {
             return std::visit(
                 [&](const auto &val) -> Variable {
                     using T = std::decay_t<decltype(val)>;
@@ -121,6 +123,7 @@ struct Problem
         produce_relations();
         print_relations();
         produce_FNF();
+        printFNF();
     }
 
     using RelationT = std::vector<std::pair<size_t, size_t>>;
@@ -158,9 +161,94 @@ struct Problem
         fmt::println("Independent:");
         print_arr(I);
     }
+
+    std::vector<std::vector<size_t>> FNF{};
+
     void produce_FNF()
     {
-        // TODO: implement
+        constexpr size_t empty_token = std::numeric_limits<size_t>::max();
+        std::vector<std::vector<size_t>> stacks{productions.size(), std::vector<size_t>()};
+        // populate stack
+
+        // TODO: use vector<bool> (will use only a bit instead of 8 bytes per entry)
+        for (size_t a_ix = productions.size() - 1; a_ix < productions.size(); a_ix--) {
+            stacks.at(a_ix).push_back(a_ix);
+            const Production &a = productions.at(a_ix);
+            for (size_t b_ix = 0; b_ix < productions.size(); ++b_ix) {
+                const Production &b = productions.at(b_ix);
+                if (a_ix == b_ix)
+                    continue;
+                if (a.is_dependent(b)) {
+                    stacks.at(b_ix).push_back(empty_token);
+                }
+            }
+        }
+
+        // empty the stack
+        std::vector<size_t> group{};
+        while (true) {
+            group.clear();
+            std::vector<size_t> empty_stacks{};
+            for (size_t i = 0; i < stacks.size(); ++i) {
+                auto &stack = stacks.at(i);
+                if (stack.empty()) {
+                    empty_stacks.push_back(i);
+                    continue;
+                }
+
+                if (stack.back() == empty_token) {
+                    continue;
+                }
+
+                auto to_be_pushed_back = stack.back();
+                group.push_back(to_be_pushed_back);
+                stack.pop_back();
+            }
+
+            for (const auto &name : empty_stacks) {
+                // stacks.erase(name);
+            }
+
+            for (const size_t a_name : group) {
+                const Production &a = productions.at(a_name);
+                for (size_t b_name = 0; b_name < stacks.size(); ++b_name) {
+                    auto &stack = stacks.at(b_name);
+                    if (a_name == b_name) {
+                        continue;
+                    }
+                    if (stack.empty())
+                        continue;
+                    const Production &b = productions.at(b_name);
+                    if (a.is_dependent(b)
+                        // && stack.back() == empty_token
+                    ) {
+                        assert(stack.back() == empty_token);
+                        stack.pop_back();
+                    }
+                }
+            }
+            if (group.empty())
+                return;
+            // fmt::println("Group: {}", group);
+            FNF.emplace_back(std::move(group));
+            group = std::vector<size_t>();
+            if (empty_stacks.size() == stacks.size()) {
+                assert(false); // We should never get here
+                return;
+            }
+        }
+    }
+
+    void printFNF() const
+    {
+        for (const std::vector<size_t> &group : FNF) {
+            fmt::println("### Group seperator ###");
+            for (size_t ix : group) {
+                fmt::println("{}", productions.at(ix));
+            }
+
+            fmt::println("### Group seperator ###");
+        }
     }
 
     static void interpret_production(const Production &prod,
@@ -264,7 +352,11 @@ void simple_test()
     analysis::Problem problem{};
     std::vector<trace::Variable> vec{10, problem.get_element()};
     problem.log.clear();
-    vec[0] += vec[1] + vec[2] * 2;
+    for (auto &v : vec) {
+        v = v + 1.0;
+    }
+    vec[0] *= 2.0;
+    vec[1] += 1.0;
 
     problem.parse(vec);
 }
