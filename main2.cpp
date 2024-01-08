@@ -1,6 +1,7 @@
 // #include <blaze/Math.h>
 #include "Expression.hpp"
 #include "Matrix.hpp"
+#include "trace.hpp"
 
 #include "fmt/core.h"
 #include <algorithm>
@@ -118,68 +119,69 @@ namespace analysis {
 
 struct Problem
 {
-    std::vector<trace::BinOp> log{};
+    std::vector<trace::Production> log{};
 
-    trace::Element get_element() { return trace::Element(&log); }
-    void parse(std::span<trace::Element> data)
+    trace::Variable get_element() { return trace::Variable(&log); }
+
+    void parse(std::span<trace::Variable> data)
     {
-        std::vector<Production> productions{};
-        std::map<const trace::Element *, size_t> tmp_element_to_ix{};
-        size_t biggest_tmp_ix = 0;
-        auto is_final = [&](const trace::Element *lhs) -> bool {
-            return (lhs >= data.data() && ((lhs - data.data()) < data.size()));
-        };
-        auto generate_variable = [&](const trace::Element *lhs) -> Variable {
-            if (is_final(lhs)) {
-                Variable ret{};
-                ret.type = VariableType::FINAL;
-                ret.index = lhs - data.data();
-                return ret;
-            } else {
-                Variable ret{};
-                ret.type = VariableType::TEMPORARY;
-                ret.index = 0; // TODO: fix
-                if (tmp_element_to_ix.contains(lhs)) {
-                    ret.index = tmp_element_to_ix.at(lhs);
-                } else {
-                    ret.index = biggest_tmp_ix;
-                    tmp_element_to_ix[lhs] = biggest_tmp_ix++;
-                }
+        //     std::vector<Production> productions{};
+        //     std::map<const trace::Element *, size_t> tmp_element_to_ix{};
+        //     size_t biggest_tmp_ix = 0;
+        //     auto is_final = [&](const trace::Element *lhs) -> bool {
+        //         return (lhs >= data.data() && ((lhs - data.data()) < data.size()));
+        //     };
+        //     auto generate_variable = [&](const trace::Element *lhs) -> Variable {
+        //         if (is_final(lhs)) {
+        //             Variable ret{};
+        //             ret.type = VariableType::FINAL;
+        //             ret.index = lhs - data.data();
+        //             return ret;
+        //         } else {
+        //             Variable ret{};
+        //             ret.type = VariableType::TEMPORARY;
+        //             ret.index = 0; // TODO: fix
+        //             if (tmp_element_to_ix.contains(lhs)) {
+        //                 ret.index = tmp_element_to_ix.at(lhs);
+        //             } else {
+        //                 ret.index = biggest_tmp_ix;
+        //                 tmp_element_to_ix[lhs] = biggest_tmp_ix++;
+        //             }
 
-                return ret;
-            }
-        };
+        //             return ret;
+        //         }
+        //     };
 
-        auto generate_rhs = [&](const trace::BinOp &op) -> decltype(Production::rhs) {
-            if (op.rhs.op == trace::Operations::VALUE) {
-                Variable var = generate_variable(op.rhs.lhs);
-                return var;
-            } else {
-                BinOp bin_op;
-                bin_op.lhs = generate_variable(op.rhs.lhs);
-                bin_op.op = op.rhs.op;
-                bin_op.rhs = generate_variable(std::get<const trace::Element *>(op.rhs.rhs));
-                return bin_op;
-            }
-        };
+        //     auto generate_rhs = [&](const trace::BinOp &op) -> decltype(Production::rhs) {
+        //         if (op.rhs.op == trace::Operations::VALUE) {
+        //             Variable var = generate_variable(op.rhs.lhs);
+        //             return var;
+        //         } else {
+        //             BinOp bin_op;
+        //             bin_op.lhs = generate_variable(op.rhs.lhs);
+        //             bin_op.op = op.rhs.op;
+        //             bin_op.rhs = generate_variable(std::get<const trace::Element *>(op.rhs.rhs));
+        //             return bin_op;
+        //         }
+        //     };
 
-        productions.reserve(log.size());
-        for (const auto &op : log) {
-            if (op.rhs.op == trace::Operations::DESTROY) {
-                if (!is_final(op.lhs) && tmp_element_to_ix.contains(op.lhs)) {
-                    tmp_element_to_ix.at(op.lhs) = biggest_tmp_ix++;
-                }
-                continue;
-            }
-            Production production;
-            production.lhs = generate_variable(op.lhs);
-            production.rhs = generate_rhs(op);
-            productions.push_back(production);
-        }
+        //     productions.reserve(log.size());
+        //     for (const auto &op : log) {
+        //         if (op.rhs.op == trace::Operations::DESTROY) {
+        //             if (!is_final(op.lhs) && tmp_element_to_ix.contains(op.lhs)) {
+        //                 tmp_element_to_ix.at(op.lhs) = biggest_tmp_ix++;
+        //             }
+        //             continue;
+        //         }
+        //         Production production;
+        //         production.lhs = generate_variable(op.lhs);
+        //         production.rhs = generate_rhs(op);
+        //         productions.push_back(production);
+        //     }
 
-        for (const auto &prod : productions) {
-            fmt::println("{}", prod);
-        }
+        //     for (const auto &prod : productions) {
+        //         fmt::println("{}", prod);
+        //     }
     }
 };
 
@@ -193,8 +195,8 @@ void test_with_matrix()
     // vec[0] = vec[1] + vec[0];
     // vec[1] = vec[1] + 0.1;
 
-    Matrix<trace::Element> mat{6, 5, problem.get_element()};
-    problem.log.clear();
+    Matrix<trace::Variable> mat{6, 5, problem.get_element()};
+    // problem.log.clear();
     mat.gaussian_elimination();
 
     for (auto &v : problem.log) {
@@ -207,7 +209,7 @@ void test_with_matrix()
 void simple_test()
 {
     analysis::Problem problem{};
-    std::vector<trace::Element> vec{10, problem.get_element()};
+    std::vector<trace::Variable> vec{10, problem.get_element()};
     vec[0] += vec[1] + vec[2];
 
     problem.parse(vec);
@@ -215,6 +217,6 @@ void simple_test()
 
 int main()
 {
-    // test_with_matrix();
-    simple_test();
+    test_with_matrix();
+    // simple_test();
 }

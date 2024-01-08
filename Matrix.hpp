@@ -11,11 +11,9 @@ struct Matrix
     const size_t width_;
     const size_t height_;
     std::vector<T> values_;
-    T initial_value_;
     constexpr Matrix(size_t width, size_t height, T initial_value)
         : width_(width)
         , height_(height)
-        , initial_value_{initial_value}
     {
         values_ = std::vector<T>(width * height, initial_value);
     }
@@ -32,8 +30,7 @@ struct Matrix
 
         for (size_t column_ix = 0; column_ix < up_to; column_ix++) {
             for (size_t row_ix = column_ix + 1; row_ix < up_to; row_ix++) {
-                T m = initial_value_;
-                m = row(row_ix)[column_ix] / row(column_ix)[column_ix];
+                T m = row(row_ix)[column_ix] / row(column_ix)[column_ix];
                 for (size_t i = column_ix; i < width_; i++) {
                     row(row_ix)[i] -= m * row(column_ix)[i];
                 }

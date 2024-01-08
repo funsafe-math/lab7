@@ -1,17 +1,31 @@
 #pragma once
 
 #include <cstddef>
-#include <fmt/core.h>
-#include <fmt/format.h>
-
-// #include <fmt/std.h>
 #include <optional>
 #include <variant>
 #include <vector>
 
+#include <fmt/core.h>
+#include <fmt/format.h>
+
+/*
+ * Goals:
+ * - calculate max amount of threads that can be used for the computation
+ * - calculate 2D pseudo-matrix of calculations to perform
+ * 
+ * 2 versions:
+ * - dynamic
+ * - compile-time-known
+ * 
+ * Possible optimizations:
+ * - When running on a platform supporting SIMD (like modern x86), in a foata layer, group tasks to use SIMD functionality
+ * 
+ * Look at https://godbolt.org/z/zdEE3fr7o
+*/
+
 namespace trace {
 
-enum class Operations { UNKNOWN, ADD, SUBSTRACT, MULTIPLY, DIVIDE, VALUE, UNARY_SUBSTRACT };
+enum class Operations { ADD, SUBSTRACT, MULTIPLY, DIVIDE, VALUE, UNARY_SUBSTRACT };
 
 struct Variable;
 
@@ -34,51 +48,9 @@ struct Expression // Binary or unary operation
         return {lhs, rhs, op};
     }
 
-    // inline static Expression makeUnaryOp(const Variable *val, Operations op)
-    // {
-    //     Expression ret;
-    //     ret.lhs = val;
-    //     ret.op = op;
-    //     return ret;
-    // }
     inline static Expression makeLiteral(const float val) { return {val, val, Operations::VALUE}; }
 
     bool isUnaryOp() const { return op == Operations::VALUE; }
-
-    // Please do not call unless you know what you're doing
-    // std::optional<const Variable *> any_variable() const
-    // {
-    //     if (std::holds_alternative<const Variable *>(lhs)) {
-    //         return std::get<const Variable *>(lhs);
-    //     }
-    //     if (std::holds_alternative<const Variable *>(rhs)) {
-    //         return std::get<const Variable *>(rhs);
-    //     }
-    //     return {};
-    // }
-
-    // Evaluate if both operands are literal types
-    // std::optional<float> evaluate() const
-    // {
-    //     if (any_variable().has_value())
-    //         return {};
-    //     float lhs = std::get<float>(this->lhs);
-    //     float rhs = std::get<float>(this->rhs);
-    //     switch (op) {
-    //     case Operations::UNKNOWN:
-    //         return {};
-    //     case Operations::ADD:
-    //         return (lhs + rhs);
-    //     case Operations::SUBSTRACT:
-    //         return (lhs - rhs);
-    //     case Operations::MULTIPLY:
-    //         return (lhs * rhs);
-    //     case Operations::DIVIDE:
-    //         return (lhs / rhs);
-    //     case Operations::VALUE:
-    //         return (lhs);
-    //     }
-    // }
 };
 
 struct Production
@@ -254,9 +226,6 @@ struct Variable
         log->push_back(p);
     };
     Variable(Variable &&other) = delete;
-    // Variable(const VariableInitializer &other)
-    //     : log{other.log}
-    // {}
     ~Variable() {}
 
 private:
@@ -352,9 +321,6 @@ struct fmt::formatter<trace::Operations> : formatter<string_view>
     {
         string_view name = "unknown";
         switch (op) {
-        case trace::Operations::UNKNOWN:
-            name = "UNKNOWN";
-            break;
         case trace::Operations::ADD:
             name = "+";
             break;
@@ -403,8 +369,8 @@ struct fmt::formatter<trace::Expression> : formatter<string_view>
     auto format(const trace::Expression &expr, FormatContext &ctx)
     {
         switch (expr.op) {
-        case trace::Operations::UNKNOWN:
-            throw std::runtime_error("UNKNOWN operation");
+        // case trace::Operations::UNKNOWN:
+        //     throw std::runtime_error("UNKNOWN operation");
         case trace::Operations::ADD:
         case trace::Operations::SUBSTRACT:
         case trace::Operations::MULTIPLY:
