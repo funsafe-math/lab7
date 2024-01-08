@@ -11,15 +11,6 @@
 #include "Matrix.hpp"
 #include "analysis.hpp"
 
-template<class... Ts>
-struct overloaded : Ts...
-{
-    using Ts::operator()...;
-};
-// explicit deduction guide (not needed as of C++20)
-template<class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
-
 namespace analysis {
 
 struct Graph
@@ -216,14 +207,14 @@ struct Problem
 
         //
 
-        for (const Production &prod : productions) {
-            fmt::println("{}", prod);
-        }
+        // for (const Production &prod : productions) {
+        //     fmt::println("{}", prod);
+        // }
 
-        produce_relations();
+        // produce_relations();
         // print_relations();
         produce_FNF();
-        printFNF();
+        // printFNF();
 
         Graph graph = produce_dependence_graph();
     }
@@ -392,6 +383,31 @@ struct Problem
         }
     }
 
+    // Only for testing purposes
+    void interpret_multithreaded(std::span<float> data) const
+    {
+        // Interpret the pseudo-assembly
+        size_t n_temporary_variables = 0;
+        for (const Production &prod : productions) {
+            if (std::holds_alternative<TemporaryVariable>(prod.lhs)) {
+                auto &tmp = std::get<TemporaryVariable>(prod.lhs);
+                n_temporary_variables = std::max(n_temporary_variables, tmp.number);
+            }
+        }
+
+        std::vector<float> temporary_variables(n_temporary_variables + 1, float{});
+
+        // for (const Production &prod : productions) {
+        //     interpret_production(prod, data, temporary_variables);
+        // }
+        for (const std::vector<size_t> group : FNF) {
+            for (const size_t ix : group) {
+                const Production &prod = productions.at(ix);
+                interpret_production(prod, data, temporary_variables);
+            }
+        }
+    }
+
     Graph produce_dependence_graph()
     {
         Graph ret{};
@@ -442,6 +458,54 @@ constexpr Matrix<float> generate_matrix()
     return ret;
 }
 
+constexpr Matrix<float> generate_bigger_matrix()
+{
+    Matrix<float> ret{15, 16, 0};
+    ret.values_
+        = {0.3598381494, 0.8409342858, 0.2078457000, 0.3076592230, 0.5746280031, 0.3193307736,
+           0.3614672566, 0.7279397259, 0.9533114347, 0.0125489458, 0.3668514230, 0.0822051884,
+           0.6728263458, 0.2414697087, 0.8907866449, 0.0990509280, 0.8448001488, 0.7335959037,
+           0.4410333892, 0.0004641690, 0.2571903929, 0.2827449953, 0.1344851542, 0.8379886466,
+           0.9408241372, 0.7638297249, 0.7754726642, 0.3612390876, 0.4475851775, 0.6895253650,
+           0.0611367836, 0.5240200388, 0.3451626587, 0.9028476472, 0.9895839527, 0.4061565322,
+           0.5826884804, 0.1881432569, 0.8365774747, 0.2832440536, 0.0622547836, 0.5527200972,
+           0.3878068150, 0.8118781254, 0.9632170592, 0.6823218116, 0.4663162978, 0.8145247654,
+           0.1093526633, 0.6058778448, 0.1784634465, 0.9460446959, 0.9433581349, 0.9184359435,
+           0.7168164496, 0.6029857273, 0.4788331646, 0.0059115238, 0.0046892389, 0.7971097761,
+           0.9368129044, 0.5912644209, 0.9445518145, 0.3562214748, 0.6420745397, 0.5789400685,
+           0.5413422112, 0.7382183675, 0.1538579404, 0.6128888873, 0.7117459899, 0.9483826822,
+           0.5363043470, 0.9832042774, 0.1617978656, 0.5352875036, 0.1358311358, 0.5173959241,
+           0.3176994038, 0.4072910492, 0.2258247967, 0.8745417488, 0.9285354458, 0.2594445028,
+           0.4034480317, 0.2240388131, 0.6246113122, 0.7297402803, 0.6790216676, 0.6353992729,
+           0.4114219336, 0.0139796539, 0.7853549691, 0.6315148523, 0.8068024749, 0.5601392847,
+           0.3525633491, 0.2650392302, 0.0876001591, 0.6359691166, 0.2433253886, 0.7660147408,
+           0.9022450545, 0.0176539539, 0.5241959248, 0.2785960288, 0.3268870842, 0.7827245496,
+           0.2605054719, 0.4557001634, 0.2953058685, 0.2070036651, 0.5655408288, 0.7126389005,
+           0.2165884607, 0.0632256706, 0.1091152343, 0.7542658297, 0.5096093700, 0.1980688909,
+           0.5963010280, 0.5848972130, 0.7296366203, 0.1246918985, 0.5640114466, 0.5862422241,
+           0.9399262573, 0.5094661313, 0.2112823140, 0.4058047461, 0.9899567962, 0.8544495118,
+           0.8785187571, 0.3366953742, 0.4019945394, 0.3812462110, 0.2216356655, 0.5895190368,
+           0.6389691158, 0.1072504053, 0.0889349987, 0.3579798574, 0.6291786687, 0.3718725101,
+           0.6017271235, 0.8620720106, 0.5571317762, 0.6181986809, 0.9641170863, 0.6162011510,
+           0.0948736058, 0.0646352080, 0.0830413107, 0.0143082636, 0.4444321599, 0.0114416364,
+           0.1665537668, 0.9500438661, 0.7895594488, 0.9186577436, 0.0865250001, 0.5972672054,
+           0.0137319643, 0.0647808592, 0.4413314562, 0.6646218739, 0.8314134551, 0.5496519350,
+           0.9347766200, 0.4076652435, 0.8008724220, 0.6403601923, 0.8993992383, 0.4330066054,
+           0.0393853043, 0.9755776891, 0.5354885381, 0.8611343274, 0.8454461847, 0.9415865965,
+           0.7115397145, 0.7280899996, 0.8476419914, 0.6123640034, 0.9775477666, 0.6008731913,
+           0.7461419270, 0.0064400154, 0.7794512955, 0.2574379281, 0.1902886965, 0.0548470032,
+           0.7312017753, 0.9393672943, 0.8445678922, 0.5973289158, 0.2003489442, 0.1237908044,
+           0.2352716256, 0.9280816961, 0.3936953738, 0.9808339366, 0.5414606953, 0.8976471080,
+           0.5914889976, 0.6838673279, 0.0963694169, 0.3441834018, 0.1717851197, 0.5220487224,
+           0.9991857941, 0.6751889463, 0.5910245339, 0.3281276648, 0.9021790219, 0.7498552792,
+           0.5425374148, 0.0792096039, 0.7344354286, 0.8225782968, 0.1015977843, 0.6541523947,
+           0.8510025307, 0.1997580345, 0.7838164701, 0.6384948161, 0.8550308482, 0.4348680819,
+           0.0930752870, 0.7562935026, 0.1305411126, 0.3408784191, 0.3158685483, 0.9779708263,
+           0.9447345766, 0.8344664526, 0.0308326939, 0.6042533948, 0.8313023673, 0.6430521759};
+
+    return ret;
+}
+
 void test_implementation()
 {
     auto correct_solution = generate_matrix();
@@ -470,6 +534,66 @@ void test_implementation()
     print_matrix(generated_solution);
 }
 
+void multithreaded_test_implementation()
+{
+    auto correct_solution = generate_matrix();
+    correct_solution.gaussian_elimination();
+
+    analysis::Problem problem{};
+    Matrix<trace::Variable> training{4, 3, problem.get_element()};
+    problem.log.clear();
+    training.gaussian_elimination();
+    problem.parse(training.values_);
+
+    auto generated_solution = generate_matrix();
+    problem.interpret(generated_solution.values_);
+
+    for (size_t i = 0; i < correct_solution.values_.size(); i++) {
+        fmt::println("Correct: {:5}, \tGenerated: {:5}",
+                     correct_solution.values_[i],
+                     generated_solution.values_[i]);
+        if (correct_solution.values_[i] != generated_solution.values_[i]) {
+            throw std::runtime_error("Incorrect");
+        }
+    }
+    fmt::println("Correct:");
+    print_matrix(correct_solution);
+    fmt::println("Generated:");
+    print_matrix(generated_solution);
+}
+
+void big_multithreaded_test_implementation()
+{
+    auto correct_solution = generate_bigger_matrix();
+    fmt::println("Starting matrix:");
+    print_matrix(correct_solution);
+    correct_solution.gaussian_elimination();
+
+    analysis::Problem problem{};
+    Matrix<trace::Variable> training{correct_solution.width_,
+                                     correct_solution.height_,
+                                     problem.get_element()};
+    problem.log.clear();
+    training.gaussian_elimination();
+    problem.parse(training.values_);
+
+    auto generated_solution = generate_bigger_matrix();
+    problem.interpret(generated_solution.values_);
+
+    for (size_t i = 0; i < correct_solution.values_.size(); i++) {
+        fmt::println("Correct: {:5}, \tGenerated: {:5}",
+                     correct_solution.values_[i],
+                     generated_solution.values_[i]);
+        if (correct_solution.values_[i] != generated_solution.values_[i]) {
+            throw std::runtime_error("Incorrect");
+        }
+    }
+    fmt::println("Correct:");
+    print_matrix(correct_solution);
+    fmt::println("Generated:");
+    print_matrix(generated_solution);
+}
+
 void test_with_matrix()
 {
     analysis::Problem problem{};
@@ -478,7 +602,7 @@ void test_with_matrix()
     // vec[0] = vec[1] + vec[0];
     // vec[1] = vec[1] + 0.1;
 
-    Matrix<trace::Variable> mat{6, 5, problem.get_element()};
+    Matrix<trace::Variable> mat{16, 15, problem.get_element()};
     problem.log.clear();
     mat.gaussian_elimination();
 
@@ -488,10 +612,10 @@ void test_with_matrix()
     fmt::println("##########################");
     problem.parse(mat.values_);
 
-    fmt::println("Graph: ");
-    auto graph = problem.produce_dependence_graph();
-    std::string dot = graph.transitive_reduction().as_dot();
-    fmt::println("{}", graph.transitive_reduction().as_dot());
+    // fmt::println("Graph: ");
+    // auto graph = problem.produce_dependence_graph();
+    // std::string dot = graph.transitive_reduction().as_dot();
+    // fmt::println("{}", graph.transitive_reduction().as_dot());
 }
 
 void simple_test()
@@ -511,6 +635,8 @@ void simple_test()
 int main()
 {
     // test_implementation();
-    test_with_matrix();
+    // test_with_matrix();
+    // multithreaded_test_implementation();
+    big_multithreaded_test_implementation();
     // simple_test();
 }

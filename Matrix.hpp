@@ -45,6 +45,7 @@ template<typename T>
 void print_matrix(Matrix<T> &mat)
 {
     for (size_t i = 0; i < mat.height_; ++i) {
-        fmt::println("{}", mat[i]);
+        // fmt::println("{::+4.2f}", mat[i]);
+        fmt::println("{:: 04.2f}", mat[i]);
     }
 }

@@ -49,7 +49,8 @@ target_link_libraries(mm1 PUBLIC OpenMP::OpenMP_CXX)
 
 target_link_libraries(lab7 fmt::fmt)
 target_link_libraries(tracing fmt::fmt -fsanitize=address)
-target_link_libraries(analysis fmt::fmt -fsanitize=address)
+# target_link_libraries(analysis fmt::fmt -fsanitize=address)
+target_link_libraries(analysis fmt::fmt)
 target_link_libraries(lab7_2 fmt::fmt blaze::blaze)
 
 include(GNUInstallDirs)
