@@ -255,33 +255,48 @@ struct Problem
         std::vector<std::vector<bool>> stacks{productions.size(), std::vector<bool>()};
         // populate stack
 
-        // uint n_threads = std::thread::hardware_concurrency();
-        // std::vector<decltype(stacks)> ministacks(n_threads, stacks);
+        uint n_threads = std::thread::hardware_concurrency();
+        std::vector<decltype(stacks)> ministacks(n_threads, stacks);
 
-#if 1
-#pragma omp parallel for ordered
-        for (size_t _a_ix = 0; _a_ix < productions.size(); _a_ix++) {
-            size_t a_ix = productions.size() - 1 - _a_ix;
-            const Production a = productions.at(a_ix);
-            std::vector<bool> tmp(productions.size(), false);
-            for (size_t b_ix = 0; b_ix < productions.size(); ++b_ix) {
-                const Production b = productions[b_ix];
-                if (a_ix == b_ix)
-                    continue;
-                tmp.at(b_ix) = a.is_dependent(b);
-            }
+        std::vector<std::thread> threads{};
 
-#pragma omp ordered
-            {
-                stacks.at(a_ix).push_back(non_empty_token);
-                for (size_t b_ix = 0; b_ix < productions.size(); ++b_ix) {
-                    if (tmp.at(b_ix)) {
-                        stacks.at(b_ix).push_back(empty_token);
+        for (size_t i = 0; i < n_threads; ++i) {
+            auto func = [&](size_t thread_ix) {
+                size_t chunk_size = (productions.size() + n_threads) / n_threads;
+                size_t starting_ix = chunk_size * thread_ix;
+                size_t ending_ix = chunk_size * (thread_ix + 1);
+                ending_ix = std::min(ending_ix, productions.size());
+                std::vector<std::vector<bool>> &stacks = ministacks.at(thread_ix);
+
+                for (size_t _a_ix = starting_ix; _a_ix < ending_ix; _a_ix++) {
+                    size_t a_ix = productions.size() - 1 - _a_ix;
+                    stacks.at(a_ix).push_back(non_empty_token);
+                    const Production a = productions.at(a_ix);
+                    for (size_t b_ix = 0; b_ix < productions.size(); ++b_ix) {
+                        // const Production b = productions.at(b_ix);
+                        const Production b = productions[b_ix];
+                        if (a_ix == b_ix)
+                            continue;
+                        if (a.is_dependent(b)) {
+                            stacks.at(b_ix).push_back(empty_token);
+                        }
                     }
                 }
+            };
+            threads.emplace_back(std::thread{func, i});
+        }
+
+        for (auto &th : threads) {
+            th.join();
+        }
+
+        for (size_t i = 0; i < productions.size(); ++i) {
+            std::vector<bool> &master = stacks.at(i);
+            for (const auto &st : ministacks) {
+                const std::vector<bool> &child = st.at(i);
+                master.insert(master.end(), child.begin(), child.end());
             }
         }
-#endif
 
         // empty the stack
         std::vector<size_t> group{};
@@ -787,7 +802,7 @@ void test_with_matrix()
     // vec[0] = vec[1] + vec[0];
     // vec[1] = vec[1] + 0.1;
 
-    Matrix<trace::Variable> mat{31, 30, problem.get_element()};
+    Matrix<trace::Variable> mat{41, 40, problem.get_element()};
     problem.log.clear();
     mat.gaussian_elimination();
 
