@@ -14,13 +14,15 @@ FetchContent_Declare(fmt
 FetchContent_MakeAvailable(fmt)
 find_package(fmt)
 
-FetchContent_Declare(blaze
-  GIT_REPOSITORY https://github.com/dendisuhubdy/blaze.git
-  GIT_TAG master
-)
-FetchContent_MakeAvailable(blaze)
-find_package(blaze)
+# FetchContent_Declare(blaze
+#   GIT_REPOSITORY https://github.com/dendisuhubdy/blaze.git
+#   GIT_TAG master
+# )
+# FetchContent_MakeAvailable(blaze)
+# find_package(blaze)
 
+add_compile_options(-mtune=native -fconstexpr-backtrace-limit=0 -fconstexpr-steps=4290000000)
+# add_compile_options(-mtune=native -fexperimental-new-constant-interpreter)
 add_executable(lab7
     src/main.cpp
 )
@@ -51,7 +53,6 @@ add_executable(simple_elimination_test
 target_link_libraries(simple_elimination_test fmt::fmt)
 
 
-
 find_package(OpenMP)
 add_executable(mm1
     mm/mm1.c
@@ -60,9 +61,9 @@ target_link_libraries(mm1 PUBLIC OpenMP::OpenMP_CXX)
 
 target_link_libraries(lab7 fmt::fmt)
 target_link_libraries(tracing fmt::fmt -fsanitize=address)
-target_link_libraries(analysis fmt::fmt -fsanitize=address)
-# target_link_libraries(analysis fmt::fmt)
-target_link_libraries(lab7_2 fmt::fmt blaze::blaze)
+# target_link_libraries(analysis fmt::fmt -fsanitize=address)
+target_link_libraries(analysis fmt::fmt)
+target_link_libraries(lab7_2 fmt::fmt)
 
 include(GNUInstallDirs)
 install(TARGETS lab7

@@ -10,7 +10,7 @@ int SIZE;
 #include <sys/time.h>
 #include <time.h>
 
-static double gtod_ref_time_sec = 0.0;
+static double gtod_ref_time_sec = 0.0F;
 
 /* Adapted from the bl2_clock() routine in the BLIS library */
 

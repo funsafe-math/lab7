@@ -178,10 +178,10 @@ struct Expression : public std::variant<Variable, BinOp, UnaryOp>
             },
             *this);
     }
-    constexpr bool contains(const WritableVariable &w) const
+    constexpr bool contains(const WritableVariable w) const
     {
         return std::visit(
-            [&](auto x) -> float {
+            [&](auto x) -> bool {
                 using T = std::decay_t<decltype(x)>;
                 if constexpr (std::is_same_v<T, Variable>)
                     return x == w;
@@ -207,7 +207,8 @@ struct Production
 
     constexpr bool is_dependent(const Production &other) const
     {
-        return lhs == other.lhs || this->rhs.contains(other.lhs) || other.rhs.contains(this->lhs);
+        // return lhs == other.lhs || this->rhs.contains(other.lhs) || other.rhs.contains(this->lhs);
+        return this->rhs.contains(other.lhs) || other.rhs.contains(this->lhs);
     }
     constexpr auto operator<=>(const Production &) const = default;
 };

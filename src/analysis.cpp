@@ -23,10 +23,13 @@ struct myMap
     constexpr bool contains(const K key)
     {
         // TODO: replace with std::binary_search
-        return std::find_if(store.begin(),
-                            store.end(),
-                            [key](std::pair<K, V> pair) { return pair.first == key; })
-               != store.end();
+        std::pair<K, V> p{key, V{}};
+        return std::binary_search(store.begin(),
+                                  store.end(),
+                                  p,
+                                  [](std::pair<K, V> a, std::pair<K, V> b) {
+                                      return a.first < b.first;
+                                  });
     }
 
     constexpr V &at(const K key)
@@ -53,8 +56,17 @@ struct myMap
 
     constexpr void insert(const K key, const V value)
     {
-        store.push_back({key, value});
-        std::sort(store.begin(), store.end());
+        // store.push_back({key, value});
+        // std::sort(store.begin(), store.end());
+        // key
+        std::pair p{key, value};
+        store.insert(std::upper_bound(store.begin(),
+                                      store.end(),
+                                      p,
+                                      [](std::pair<K, V> a, std::pair<K, V> b) {
+                                          return a.first < b.first;
+                                      }),
+                     p);
     }
 };
 
@@ -68,7 +80,20 @@ struct Problem
     constexpr void parse(std::span<trace::Variable> data)
     {
         // std::map<const trace::Variable *, size_t> tmp_variable_to_ix{};
-        myMap<const trace::Variable *, size_t> tmp_variable_to_ix{};
+        myMap<size_t, size_t> tmp_variable_to_ix{};
+
+        // Hack to allow compiler to compare pointers from different allocations at compile time
+        std::vector<const trace::Variable *> pointers{};
+
+        auto ptr_to_ix = [&](const trace::Variable *ptr) -> size_t {
+            auto it = std::find(pointers.begin(), pointers.end(), ptr);
+            if (it == pointers.end()) {
+                pointers.push_back(ptr);
+                return pointers.size() - 1;
+            }
+            return std::distance(pointers.begin(), it);
+        };
+
         size_t next_tmp_ix = 0;
 
         auto is_final = [&](const trace::Variable *lhs) constexpr -> bool {
@@ -92,12 +117,12 @@ struct Problem
             } else {
                 size_t index = 0;
                 // ret.index = 0; // TODO: fix
-                if (tmp_variable_to_ix.contains(lhs)) {
-                    auto index = tmp_variable_to_ix.at(lhs);
+                if (tmp_variable_to_ix.contains(ptr_to_ix(lhs))) {
+                    auto index = tmp_variable_to_ix.at(ptr_to_ix(lhs));
                     return TemporaryVariable{index};
                 } else {
                     auto index = next_tmp_ix++;
-                    tmp_variable_to_ix[lhs] = index;
+                    tmp_variable_to_ix[ptr_to_ix(lhs)] = index;
                     return TemporaryVariable{index};
                 }
             }
@@ -109,12 +134,12 @@ struct Problem
             } else {
                 size_t index = 0;
                 // ret.index = 0; // TODO: fix
-                if (tmp_variable_to_ix.contains(lhs)) {
-                    auto index = tmp_variable_to_ix.at(lhs);
+                if (tmp_variable_to_ix.contains(ptr_to_ix(lhs))) {
+                    auto index = tmp_variable_to_ix.at(ptr_to_ix(lhs));
                     return TemporaryVariable{index};
                 } else {
                     auto index = next_tmp_ix++;
-                    tmp_variable_to_ix[lhs] = index;
+                    tmp_variable_to_ix[ptr_to_ix(lhs)] = index;
                     return TemporaryVariable{index};
                 }
             }
@@ -161,7 +186,7 @@ struct Problem
             if (std::holds_alternative<TemporaryVariable>(lhs)) {
                 auto &tmp = std::get<TemporaryVariable>(lhs);
                 tmp.number = next_tmp_ix++;
-                tmp_variable_to_ix[prod.lhs] = tmp.number;
+                tmp_variable_to_ix[ptr_to_ix(prod.lhs)] = tmp.number;
             }
             productions.push_back({lhs, rhs});
         }
@@ -175,9 +200,9 @@ struct Problem
         // produce_relations();
         // print_relations();
         produce_FNF();
-        // printFNF();
+        printFNF();
 
-        Graph graph = produce_dependence_graph();
+        // Graph graph = produce_dependence_graph();
     }
 
     using RelationT = std::vector<std::pair<size_t, size_t>>;
@@ -220,16 +245,17 @@ struct Problem
 
     constexpr void produce_FNF()
     {
-        constexpr size_t empty_token = std::numeric_limits<size_t>::max();
-        std::vector<std::vector<size_t>> stacks{productions.size(), std::vector<size_t>()};
+        constexpr bool empty_token = false;
+        constexpr bool non_empty_token = true;
+        std::vector<std::vector<bool>> stacks{productions.size(), std::vector<bool>()};
         // populate stack
 
-        // TODO: use vector<bool> (will use only a bit instead of 8 bytes per entry)
         for (size_t a_ix = productions.size() - 1; a_ix < productions.size(); a_ix--) {
-            stacks.at(a_ix).push_back(a_ix);
-            const Production &a = productions.at(a_ix);
+            stacks.at(a_ix).push_back(non_empty_token);
+            const Production a = productions.at(a_ix);
             for (size_t b_ix = 0; b_ix < productions.size(); ++b_ix) {
-                const Production &b = productions.at(b_ix);
+                // const Production b = productions.at(b_ix);
+                const Production b = productions[b_ix];
                 if (a_ix == b_ix)
                     continue;
                 if (a.is_dependent(b)) {
@@ -242,11 +268,11 @@ struct Problem
         std::vector<size_t> group{};
         while (true) {
             group.clear();
-            std::vector<size_t> empty_stacks{};
+            // std::vector<size_t> empty_stacks{};
             for (size_t i = 0; i < stacks.size(); ++i) {
                 auto &stack = stacks.at(i);
                 if (stack.empty()) {
-                    empty_stacks.push_back(i);
+                    // empty_stacks.push_back(i);
                     continue;
                 }
 
@@ -255,13 +281,13 @@ struct Problem
                 }
 
                 auto to_be_pushed_back = stack.back();
-                group.push_back(to_be_pushed_back);
+                group.push_back(i);
                 stack.pop_back();
             }
 
-            for (const auto &name : empty_stacks) {
-                // stacks.erase(name);
-            }
+            // for (const auto &name : empty_stacks) {
+            //     // stacks.erase(name);
+            // }
 
             for (const size_t a_name : group) {
                 const Production &a = productions.at(a_name);
@@ -564,13 +590,13 @@ void test_with_matrix()
     // vec[0] = vec[1] + vec[0];
     // vec[1] = vec[1] + 0.1;
 
-    Matrix<trace::Variable> mat{16, 15, problem.get_element()};
+    Matrix<trace::Variable> mat{51, 50, problem.get_element()};
     problem.log.clear();
     mat.gaussian_elimination();
 
-    for (auto &v : problem.log) {
-        fmt::println("{}", v);
-    }
+    // for (auto &v : problem.log) {
+    //     fmt::println("{}", v);
+    // }
     fmt::println("##########################");
     problem.parse(mat.values_);
 
@@ -600,7 +626,7 @@ constexpr size_t matrix_count_instructions()
 {
     analysis::Problem problem{};
     // std::vector<trace::Variable> vec{10, problem.get_element()};
-    Matrix<trace::Variable> mat{16, 15, problem.get_element()};
+    Matrix<trace::Variable> mat{8, 7, problem.get_element()};
     problem.log.clear();
     mat.gaussian_elimination();
 
@@ -627,7 +653,12 @@ constexpr bool test_map()
 {
     analysis::myMap<int, int> map{};
     map[2] = 5;
-    if (!map.contains(2))
+    map[5] = 1;
+    map[6] = 1;
+    map[7] = 1;
+    map[8] = 1;
+    map[9] = 1;
+    if (!map.contains(7))
         return false;
     map[3] = 2;
     if (!map.contains(3))
@@ -642,10 +673,14 @@ static_assert(test_map() == true);
 int main()
 {
     // test_implementation();
-    // test_with_matrix();
-    multithreaded_test_implementation();
-    big_multithreaded_test_implementation();
+    test_with_matrix();
+    // multithreaded_test_implementation();
+    // big_multithreaded_test_implementation();
+
     // std::bitset<matrix_count_instructions()> test{};
+    // fmt::println("Used instructions: {}", test.size());
+
+    // return std::
     // std::bitset<count_instructions()> test{};
     // simple_test();
 }

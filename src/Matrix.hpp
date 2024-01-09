@@ -26,7 +26,13 @@ struct Matrix
         return std::span{values_.begin() + width_ * ix, width_};
     }
 
+    constexpr const std::span<const T> row(size_t ix) const
+    {
+        return std::span{values_.begin() + width_ * ix, width_};
+    }
+
     constexpr std::span<T> operator[](size_t ix) { return row(ix); }
+    constexpr std::span<const T> operator[](size_t ix) const { return row(ix); }
 
     constexpr void gaussian_elimination()
     {
@@ -61,7 +67,7 @@ struct Matrix
 };
 
 template<typename T>
-void print_matrix(Matrix<T> &mat)
+void print_matrix(const Matrix<T> &mat)
 {
     for (size_t i = 0; i < mat.height_; ++i) {
         fmt::println("{:: 04.2f}", mat[i]);
