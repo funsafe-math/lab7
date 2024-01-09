@@ -14,6 +14,8 @@ FetchContent_Declare(fmt
 FetchContent_MakeAvailable(fmt)
 find_package(fmt)
 
+find_package(TBB REQUIRED)
+
 # FetchContent_Declare(blaze
 #   GIT_REPOSITORY https://github.com/dendisuhubdy/blaze.git
 #   GIT_TAG master
@@ -62,7 +64,8 @@ target_link_libraries(mm1 PUBLIC OpenMP::OpenMP_CXX)
 target_link_libraries(lab7 fmt::fmt)
 target_link_libraries(tracing fmt::fmt -fsanitize=address)
 # target_link_libraries(analysis fmt::fmt -fsanitize=address)
-target_link_libraries(analysis fmt::fmt)
+# target_link_libraries(analysis fmt::fmt TBB::tbb OpenMP::OpenMP_CXX -fsanitize=thread)
+target_link_libraries(analysis fmt::fmt TBB::tbb OpenMP::OpenMP_CXX)
 target_link_libraries(lab7_2 fmt::fmt)
 
 include(GNUInstallDirs)

@@ -1,5 +1,9 @@
+#include <algorithm>
 #include <assert.h>
 #include <bitset>
+#include <chrono>
+#include <execution>
+#include <fmt/chrono.h>
 #include <functional>
 #include <iomanip>
 #include <map>
@@ -199,7 +203,8 @@ struct Problem
 
         // produce_relations();
         // print_relations();
-        produce_FNF();
+        produce_FNF_multithreaded();
+        // produce_FNF();
         printFNF();
 
         // Graph graph = produce_dependence_graph();
@@ -242,6 +247,96 @@ struct Problem
     }
 
     std::vector<std::vector<size_t>> FNF{};
+
+    void produce_FNF_multithreaded()
+    {
+        constexpr bool empty_token = false;
+        constexpr bool non_empty_token = true;
+        std::vector<std::vector<bool>> stacks{productions.size(), std::vector<bool>()};
+        // populate stack
+
+        // uint n_threads = std::thread::hardware_concurrency();
+        // std::vector<decltype(stacks)> ministacks(n_threads, stacks);
+
+#if 1
+#pragma omp parallel for ordered
+        for (size_t _a_ix = 0; _a_ix < productions.size(); _a_ix++) {
+            size_t a_ix = productions.size() - 1 - _a_ix;
+            const Production a = productions.at(a_ix);
+            std::vector<bool> tmp(productions.size(), false);
+            for (size_t b_ix = 0; b_ix < productions.size(); ++b_ix) {
+                const Production b = productions[b_ix];
+                if (a_ix == b_ix)
+                    continue;
+                tmp.at(b_ix) = a.is_dependent(b);
+            }
+
+#pragma omp ordered
+            {
+                stacks.at(a_ix).push_back(non_empty_token);
+                for (size_t b_ix = 0; b_ix < productions.size(); ++b_ix) {
+                    if (tmp.at(b_ix)) {
+                        stacks.at(b_ix).push_back(empty_token);
+                    }
+                }
+            }
+        }
+#endif
+
+        // empty the stack
+        std::vector<size_t> group{};
+        while (true) {
+            group.clear();
+            // std::vector<size_t> empty_stacks{};
+            for (size_t i = 0; i < stacks.size(); ++i) {
+                auto &stack = stacks.at(i);
+                if (stack.empty()) {
+                    // empty_stacks.push_back(i);
+                    continue;
+                }
+
+                if (stack.back() == empty_token) {
+                    continue;
+                }
+
+                auto to_be_pushed_back = stack.back();
+                group.push_back(i);
+                stack.pop_back();
+            }
+
+            // for (const auto &name : empty_stacks) {
+            //     // stacks.erase(name);
+            // }
+
+            for (const size_t a_name : group) {
+                const Production &a = productions.at(a_name);
+                for (size_t b_name = 0; b_name < stacks.size(); ++b_name) {
+                    auto &stack = stacks.at(b_name);
+                    if (a_name == b_name) {
+                        continue;
+                    }
+                    if (stack.empty())
+                        continue;
+                    const Production &b = productions.at(b_name);
+                    if (a.is_dependent(b)
+                        // && stack.back() == empty_token
+                    ) {
+                        assert(stack.back() == empty_token);
+                        stack.pop_back();
+                    }
+                }
+            }
+            if (group.empty())
+                return;
+            // fmt::println("Group: {}", group);
+            FNF.emplace_back(std::move(group));
+            group = std::vector<size_t>();
+            // if (empty_stacks.size() == stacks.size()) {
+            //     assert(false); // We should never get here
+            //     return;
+            // }
+        }
+    }
 
     constexpr void produce_FNF()
     {
@@ -312,10 +407,10 @@ struct Problem
             // fmt::println("Group: {}", group);
             FNF.emplace_back(std::move(group));
             group = std::vector<size_t>();
-            if (empty_stacks.size() == stacks.size()) {
-                assert(false); // We should never get here
-                return;
-            }
+            // if (empty_stacks.size() == stacks.size()) {
+            //     assert(false); // We should never get here
+            //     return;
+            // }
         }
     }
 
@@ -387,11 +482,15 @@ struct Problem
         // for (const Production &prod : productions) {
         //     interpret_production(prod, data, temporary_variables);
         // }
-        for (const std::vector<size_t> group : FNF) {
-            for (const size_t ix : group) {
+        for (const std::vector<size_t> &group : FNF) {
+            std::for_each(std::execution::par_unseq, group.begin(), group.end(), [&](size_t ix) {
                 const Production &prod = productions.at(ix);
                 interpret_production(prod, data, temporary_variables);
-            }
+            });
+            //     for (const size_t ix : group) {
+            //     const Production &prod = productions.at(ix);
+            //     interpret_production(prod, data, temporary_variables);
+            // }
         }
     }
 
@@ -411,6 +510,89 @@ struct Problem
         }
 
         return ret;
+    }
+
+    void generate_c_code()
+    {
+        // TODO: count how many temporary variables should exist at a time
+        size_t n_temporary_variables = 0;
+        for (const Production &prod : productions) {
+            if (std::holds_alternative<TemporaryVariable>(prod.lhs)) {
+                auto &tmp = std::get<TemporaryVariable>(prod.lhs);
+                n_temporary_variables = std::max(n_temporary_variables, tmp.number);
+            }
+        }
+
+        struct VariableLifetime
+        {
+            size_t start = std::numeric_limits<size_t>::max();
+            size_t end = std::numeric_limits<size_t>::min();
+            auto operator<=>(const VariableLifetime &) const = default;
+        };
+
+        std::vector<VariableLifetime> temporary_variables_life(n_temporary_variables + 1,
+                                                               VariableLifetime{});
+
+        size_t index{0};
+        for (const Production &prod : productions) {
+            auto add_to_vec = [&](TemporaryVariable tmp) {
+                VariableLifetime &life = temporary_variables_life.at(tmp.number);
+                life.start = std::min(index, life.start);
+                life.end = std::max(index, life.start);
+                index++;
+            };
+            if (std::holds_alternative<TemporaryVariable>(prod.lhs)) {
+                auto &tmp = std::get<TemporaryVariable>(prod.lhs);
+                add_to_vec(tmp);
+            }
+
+            auto match_variable = [&](Variable var) {
+                std::visit(
+                    [&](auto x) {
+                        using T = std::decay_t<decltype(x)>;
+                        if constexpr (std::is_same_v<T, TemporaryVariable>)
+                            add_to_vec(x);
+                    },
+                    var);
+            };
+
+            std::visit(
+                [&](auto x) {
+                    using T = std::decay_t<decltype(x)>;
+                    if constexpr (std::is_same_v<T, Variable>)
+                        match_variable(x);
+                    if constexpr (std::is_same_v<T, BinOp>) {
+                        match_variable(x.lhs);
+                        match_variable(x.rhs);
+                    }
+                    if constexpr (std::is_same_v<T, UnaryOp>)
+                        match_variable(x.var);
+                },
+                prod.rhs);
+        }
+
+        std::vector<int> temporary_variables_per_step(index, 0);
+        for (const VariableLifetime &life : temporary_variables_life) {
+            if (life == VariableLifetime{})
+                continue;
+            temporary_variables_per_step.at(life.start)++;
+            temporary_variables_per_step.at(life.end)--;
+        }
+
+        int64_t max_variables_at_a_time{0};
+        int64_t variables_at_a_time{0};
+        for (auto v : temporary_variables_per_step) {
+            variables_at_a_time += v;
+            max_variables_at_a_time = std::max(variables_at_a_time, max_variables_at_a_time);
+        }
+        // max_variables_at_a_time += 1;
+
+        assert(max_variables_at_a_time >= 0);
+        fmt::println("Max temporary variables used: {}", max_variables_at_a_time);
+
+        // for (const Production &prod : productions) {
+        //     interpret_production(prod, data, temporary_variables);
+        // }
     }
 };
 
@@ -534,13 +716,14 @@ void multithreaded_test_implementation()
     problem.parse(training.values_);
 
     auto generated_solution = generate_matrix();
-    problem.interpret(generated_solution.values_);
+    problem.interpret_multithreaded(generated_solution.values_);
 
     for (size_t i = 0; i < correct_solution.values_.size(); i++) {
         fmt::println("Correct: {:5}, \tGenerated: {:5}",
                      correct_solution.values_[i],
                      generated_solution.values_[i]);
         if (correct_solution.values_[i] != generated_solution.values_[i]) {
+            std::cout << std::endl;
             throw std::runtime_error("Incorrect");
         }
     }
@@ -566,13 +749,27 @@ void big_multithreaded_test_implementation()
     problem.parse(training.values_);
 
     auto generated_solution = generate_bigger_matrix();
-    problem.interpret(generated_solution.values_);
+    auto tick = std::chrono::high_resolution_clock::now();
+    problem.interpret_multithreaded(generated_solution.values_);
+    auto tock = std::chrono::high_resolution_clock::now();
+    fmt::println("Multithreaded interpretation took {}",
+                 std::chrono::duration_cast<std::chrono::microseconds>(tock - tick));
+
+    {
+        auto generated_solution = generate_bigger_matrix();
+        auto tick = std::chrono::high_resolution_clock::now();
+        problem.interpret(generated_solution.values_);
+        auto tock = std::chrono::high_resolution_clock::now();
+        fmt::println("Single-threaded interpretation took {}",
+                     std::chrono::duration_cast<std::chrono::microseconds>(tock - tick));
+    }
 
     for (size_t i = 0; i < correct_solution.values_.size(); i++) {
         fmt::println("Correct: {:5}, \tGenerated: {:5}",
                      correct_solution.values_[i],
                      generated_solution.values_[i]);
         if (correct_solution.values_[i] != generated_solution.values_[i]) {
+            std::cout << std::endl;
             throw std::runtime_error("Incorrect");
         }
     }
@@ -590,7 +787,7 @@ void test_with_matrix()
     // vec[0] = vec[1] + vec[0];
     // vec[1] = vec[1] + 0.1;
 
-    Matrix<trace::Variable> mat{51, 50, problem.get_element()};
+    Matrix<trace::Variable> mat{31, 30, problem.get_element()};
     problem.log.clear();
     mat.gaussian_elimination();
 
@@ -604,6 +801,7 @@ void test_with_matrix()
     // auto graph = problem.produce_dependence_graph();
     // std::string dot = graph.transitive_reduction().as_dot();
     // fmt::println("{}", graph.transitive_reduction().as_dot());
+    fmt::println("Productions processed: {}", problem.log.size());
 }
 
 // Constepxr test
@@ -670,10 +868,33 @@ constexpr bool test_map()
 
 static_assert(test_map() == true);
 
+void generate_c_code()
+{
+    analysis::Problem problem{};
+    // std::vector<Element> vec{100, &log};
+
+    // vec[0] = vec[1] + vec[0];
+    // vec[1] = vec[1] + 0.1;
+
+    Matrix<trace::Variable> mat{6, 5, problem.get_element()};
+    problem.log.clear();
+    trace::Variable v = -mat.values_[0];
+    mat.gaussian_elimination();
+    // mat.values_[mat.values_.size() - 1] = -v;
+
+    for (auto &v : problem.log) {
+        fmt::println("{}", v);
+    }
+    fmt::println("##########################");
+    problem.parse(mat.values_);
+    problem.generate_c_code();
+}
+
 int main()
 {
     // test_implementation();
     test_with_matrix();
+    // generate_c_code();
     // multithreaded_test_implementation();
     // big_multithreaded_test_implementation();
 

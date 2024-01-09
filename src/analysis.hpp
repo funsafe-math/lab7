@@ -275,6 +275,16 @@ struct fmt::formatter<analysis::BinOp> : formatter<string_view>
 };
 
 template<>
+struct fmt::formatter<analysis::UnaryOp> : formatter<string_view>
+{
+    template<typename FormatContext>
+    auto format(const analysis::UnaryOp &unary_operation, FormatContext &ctx)
+    {
+        return format_to(ctx.out(), "({}{})", unary_operation.op, unary_operation.var);
+    }
+};
+
+template<>
 struct fmt::formatter<analysis::Expression> : formatter<string_view>
 {
     template<typename FormatContext>
@@ -285,6 +295,10 @@ struct fmt::formatter<analysis::Expression> : formatter<string_view>
         }
         if (std::holds_alternative<analysis::BinOp>(expr)) {
             return format_to(ctx.out(), "{}", std::get<analysis::BinOp>(expr));
+        }
+
+        if (std::holds_alternative<analysis::UnaryOp>(expr)) {
+            return format_to(ctx.out(), "{}", std::get<analysis::UnaryOp>(expr));
         }
         throw std::runtime_error("This should never happen");
     }
