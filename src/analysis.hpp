@@ -136,7 +136,7 @@ struct UnaryOp
 {
     Variable var;
     trace::Operations op; // must be a unary operation
-    constexpr float interpret(std::span<float> finals, std::span<float> temps) const
+    constexpr float interpret(std::span<float> finals, std::span<float> temps) const noexcept
     {
         auto interpret = [&](Variable var) { return var.interpret(finals, temps); };
         switch (op) {
@@ -164,7 +164,7 @@ struct Expression : public std::variant<Variable, BinOp, UnaryOp>
 {
     using std::variant<Variable, BinOp, UnaryOp>::variant;
 
-    float interpret(std::span<float> finals, std::span<float> temps) const
+    float interpret(std::span<float> finals, std::span<float> temps) const noexcept
     {
         return std::visit(
             [&](auto x) -> float {
@@ -178,7 +178,7 @@ struct Expression : public std::variant<Variable, BinOp, UnaryOp>
             },
             *this);
     }
-    constexpr bool contains(const WritableVariable w) const
+    constexpr bool contains(const WritableVariable w) const noexcept
     {
         return std::visit(
             [&](auto x) -> bool {
@@ -200,17 +200,17 @@ struct Production
 {
     WritableVariable lhs;
     Expression rhs;
-    constexpr Production(const WritableVariable &lhs_, const Expression &rhs_)
+    constexpr Production(const WritableVariable lhs_, const Expression &rhs_) noexcept
         : lhs{lhs_}
         , rhs{rhs_}
     {}
 
-    constexpr bool is_dependent(const Production &other) const
+    constexpr bool is_dependent(const Production &other) const noexcept
     {
         // return lhs == other.lhs || this->rhs.contains(other.lhs) || other.rhs.contains(this->lhs);
         return this->rhs.contains(other.lhs) || other.rhs.contains(this->lhs);
     }
-    constexpr auto operator<=>(const Production &) const = default;
+    constexpr auto operator<=>(const Production &) const noexcept = default;
 };
 
 } // namespace analysis

@@ -66,6 +66,8 @@ target_link_libraries(tracing fmt::fmt -fsanitize=address)
 # target_link_libraries(analysis fmt::fmt -fsanitize=address)
 # target_link_libraries(analysis fmt::fmt TBB::tbb OpenMP::OpenMP_CXX -fsanitize=thread)
 target_link_libraries(analysis fmt::fmt TBB::tbb OpenMP::OpenMP_CXX)
+# set_property(TARGET analysis PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+
 target_link_libraries(lab7_2 fmt::fmt)
 
 include(GNUInstallDirs)

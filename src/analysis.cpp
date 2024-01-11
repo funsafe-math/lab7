@@ -7,6 +7,7 @@
 #include <functional>
 #include <iomanip>
 #include <map>
+#include <random>
 #include <span>
 #include <sstream>
 #include <stack>
@@ -205,7 +206,7 @@ struct Problem
         // print_relations();
         produce_FNF_multithreaded();
         // produce_FNF();
-        printFNF();
+        // printFNF();
 
         // Graph graph = produce_dependence_graph();
     }
@@ -223,8 +224,10 @@ struct Problem
                 const Production &b = productions.at(b_ix);
                 if (a.is_dependent(b)) {
                     D.emplace_back(a_ix, b_ix);
+                    // D.emplace_back(b_ix, a_ix);
                 } else {
                     I.emplace_back(a_ix, b_ix);
+                    // I.emplace_back(b_ix, a_ix);
                 }
             }
         }
@@ -248,7 +251,7 @@ struct Problem
 
     std::vector<std::vector<size_t>> FNF{};
 
-    void produce_FNF_multithreaded()
+    void produce_FNF_multithreaded() noexcept
     {
         constexpr bool empty_token = false;
         constexpr bool non_empty_token = true;
@@ -265,8 +268,16 @@ struct Problem
                 size_t chunk_size = (productions.size() + n_threads) / n_threads;
                 size_t starting_ix = chunk_size * thread_ix;
                 size_t ending_ix = chunk_size * (thread_ix + 1);
+                fmt::println("{} Processing {} items, from {} to {}",
+                             thread_ix,
+                             ending_ix - starting_ix,
+                             starting_ix,
+                             ending_ix);
+
                 ending_ix = std::min(ending_ix, productions.size());
                 std::vector<std::vector<bool>> &stacks = ministacks.at(thread_ix);
+                for (auto &stack : stacks)
+                    stack.reserve(productions.size());
 
                 for (size_t _a_ix = starting_ix; _a_ix < ending_ix; _a_ix++) {
                     size_t a_ix = productions.size() - 1 - _a_ix;
@@ -292,6 +303,7 @@ struct Problem
 
         for (size_t i = 0; i < productions.size(); ++i) {
             std::vector<bool> &master = stacks.at(i);
+            master.reserve(productions.size());
             for (const auto &st : ministacks) {
                 const std::vector<bool> &child = st.at(i);
                 master.insert(master.end(), child.begin(), child.end());
@@ -314,7 +326,6 @@ struct Problem
                     continue;
                 }
 
-                auto to_be_pushed_back = stack.back();
                 group.push_back(i);
                 stack.pop_back();
             }
@@ -390,7 +401,6 @@ struct Problem
                     continue;
                 }
 
-                auto to_be_pushed_back = stack.back();
                 group.push_back(i);
                 stack.pop_back();
             }
@@ -802,7 +812,10 @@ void test_with_matrix()
     // vec[0] = vec[1] + vec[0];
     // vec[1] = vec[1] + 0.1;
 
-    Matrix<trace::Variable> mat{41, 40, problem.get_element()};
+    constexpr size_t width = 61;
+    constexpr size_t height = 60;
+
+    Matrix<trace::Variable> mat{width, height, problem.get_element()};
     problem.log.clear();
     mat.gaussian_elimination();
 
@@ -812,11 +825,52 @@ void test_with_matrix()
     fmt::println("##########################");
     problem.parse(mat.values_);
 
+    {
+        Matrix<float> mat{width, height, 0};
+        std::random_device rd;  // Will be used to obtain a seed for the random number engine
+        std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+        std::uniform_real_distribution<> dis(1.0, 2.0);
+        for (auto &v : mat.values_) {
+            v = dis(gen);
+        }
+
+        auto tick = std::chrono::high_resolution_clock::now();
+        problem.interpret_multithreaded(mat.values_);
+        auto tock = std::chrono::high_resolution_clock::now();
+        fmt::println("Multithreaded interpretation took {}",
+                     std::chrono::duration_cast<std::chrono::microseconds>(tock - tick));
+    }
+
+    {
+        Matrix<float> mat{width, height, 0};
+        std::random_device rd;  // Will be used to obtain a seed for the random number engine
+        std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+        std::uniform_real_distribution<> dis(1.0, 2.0);
+        for (auto &v : mat.values_) {
+            v = dis(gen);
+        }
+
+        auto tick = std::chrono::high_resolution_clock::now();
+        problem.interpret(mat.values_);
+        auto tock = std::chrono::high_resolution_clock::now();
+        fmt::println("Singlethreaded interpretation took {}",
+                     std::chrono::duration_cast<std::chrono::microseconds>(tock - tick));
+        print_matrix(mat);
+    }
+
     // fmt::println("Graph: ");
     // auto graph = problem.produce_dependence_graph();
     // std::string dot = graph.transitive_reduction().as_dot();
     // fmt::println("{}", graph.transitive_reduction().as_dot());
     fmt::println("Productions processed: {}", problem.log.size());
+
+    auto elem = std::max_element(problem.FNF.begin(), problem.FNF.end(), [](auto a, auto b) {
+        return a.size() < b.size();
+    });
+    fmt::println("For a {}x{} matrix, you can use at most {} threads",
+                 mat.width_,
+                 mat.height_,
+                 elem->size());
 }
 
 // Constepxr test

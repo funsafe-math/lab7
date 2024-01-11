@@ -39,25 +39,25 @@ struct Expression // Binary or unary operation
 
     constexpr Expression(std::variant<const Variable *, float> lhs_,
                          std::variant<const Variable *, float> rhs_,
-                         Operations op_)
+                         Operations op_) noexcept
         : op{op_}
         , lhs{lhs_}
         , rhs{rhs_}
     {}
-    explicit constexpr Expression() = default;
+    explicit constexpr Expression() noexcept = default;
     inline constexpr static Expression makeBinOp(const Variable *lhs,
                                                  Operations op,
-                                                 const Variable *rhs)
+                                                 const Variable *rhs) noexcept
     {
         return {lhs, rhs, op};
     }
 
-    inline constexpr static Expression makeLiteral(const float val)
+    inline constexpr static Expression makeLiteral(const float val) noexcept
     {
         return {val, val, Operations::VALUE};
     }
 
-    constexpr bool isUnaryOp() const { return op == Operations::VALUE; }
+    constexpr bool isUnaryOp() const noexcept { return op == Operations::VALUE; }
 };
 
 struct Production
@@ -74,9 +74,9 @@ struct LiteralExpression
     float lhs;
     float rhs;
 
-    constexpr operator Expression() const { return Expression{lhs, rhs, op}; }
+    constexpr operator Expression() const noexcept { return Expression{lhs, rhs, op}; }
 
-    constexpr LiteralExpression(float literal)
+    constexpr LiteralExpression(float literal) noexcept
         : op{Operations::VALUE}
         , lhs{literal}
         , rhs{literal}
@@ -91,14 +91,14 @@ struct VariableExpression : public Expression
     constexpr VariableExpression(std::variant<const Variable *, float> lhs_,
                                  std::variant<const Variable *, float> rhs_,
                                  Operations op_,
-                                 std::vector<Production> *log_)
+                                 std::vector<Production> *log_) noexcept
         : Expression(lhs_, rhs_, op_)
         , log{log_}
     {}
 
     inline constexpr static VariableExpression makeUnaryOp(const Variable *val,
                                                            Operations op,
-                                                           std::vector<Production> *log)
+                                                           std::vector<Production> *log) noexcept
     {
         return {val, val, op, log};
     }
@@ -108,11 +108,11 @@ struct Variable
 {
     std::vector<Production> *log;
 
-    constexpr inline Variable(std::vector<Production> *log_)
+    constexpr inline Variable(std::vector<Production> *log_) noexcept
         : log{log_}
     {}
 
-    constexpr inline Variable(const VariableExpression &expr)
+    constexpr inline Variable(const VariableExpression &expr) noexcept
         : log{expr.log}
     {
         Production prod;
@@ -123,79 +123,79 @@ struct Variable
 
     // Arithmetic operators with self
 
-    inline constexpr VariableExpression operator+(const Variable &other) const
+    inline constexpr VariableExpression operator+(const Variable &other) const noexcept
     {
         return {get_id(), other.get_id(), Operations::ADD, log};
     }
 
-    inline constexpr VariableExpression operator-(const Variable &other) const
+    inline constexpr VariableExpression operator-(const Variable &other) const noexcept
     {
         return {get_id(), other.get_id(), Operations::SUBSTRACT, log};
     }
 
-    inline constexpr VariableExpression operator*(const Variable &other) const
+    inline constexpr VariableExpression operator*(const Variable &other) const noexcept
     {
         return {get_id(), other.get_id(), Operations::MULTIPLY, log};
     }
 
-    inline constexpr VariableExpression operator/(const Variable &other) const
+    inline constexpr VariableExpression operator/(const Variable &other) const noexcept
     {
         return {get_id(), other.get_id(), Operations::DIVIDE, log};
     }
 
     // Unary operators with self
-    inline constexpr VariableExpression operator-() const
+    inline constexpr VariableExpression operator-() const noexcept
     {
         return VariableExpression::makeUnaryOp(get_id(), Operations::UNARY_SUBSTRACT, log);
     }
 
-    inline constexpr const Variable &operator+() const { return *this; }
+    inline constexpr const Variable &operator+() const noexcept { return *this; }
 
     // Arithmetic operators with float
     // TODO: template this
 
-    inline constexpr VariableExpression operator+(const float other) const
+    inline constexpr VariableExpression operator+(const float other) const noexcept
     {
         return {get_id(), other, Operations::ADD, log};
     }
 
-    inline constexpr VariableExpression operator-(const float other) const
+    inline constexpr VariableExpression operator-(const float other) const noexcept
     {
         return {get_id(), other, Operations::SUBSTRACT, log};
     }
 
-    inline constexpr VariableExpression operator*(const float other) const
+    inline constexpr VariableExpression operator*(const float other) const noexcept
     {
         return {get_id(), other, Operations::MULTIPLY, log};
     }
 
-    inline constexpr VariableExpression operator/(const float other) const
+    inline constexpr VariableExpression operator/(const float other) const noexcept
     {
         return {get_id(), other, Operations::DIVIDE, log};
     }
 
     // Assignment operators with self
 
-    inline constexpr Variable &operator+=(const Variable &other)
+    inline constexpr Variable &operator+=(const Variable &other) noexcept
     {
         VariableExpression tmp = *this + other;
         *this = tmp;
         return *this;
     }
 
-    inline constexpr Variable &operator-=(const Variable &other)
+    inline constexpr Variable &operator-=(const Variable &other) noexcept
     {
         VariableExpression tmp = *this - other;
         *this = tmp;
         return *this;
     }
-    inline constexpr Variable &operator*=(const Variable &other)
+    inline constexpr Variable &operator*=(const Variable &other) noexcept
     {
         VariableExpression tmp = *this * other;
         *this = tmp;
         return *this;
     }
-    inline constexpr Variable &operator/=(const Variable &other)
+    inline constexpr Variable &operator/=(const Variable &other) noexcept
     {
         VariableExpression tmp = *this / other;
         *this = tmp;
@@ -204,7 +204,7 @@ struct Variable
 
     // Assignment operators with Expression
 
-    inline constexpr Variable &operator=(const VariableExpression &expr)
+    inline constexpr Variable &operator=(const VariableExpression &expr) noexcept
     {
         Production prod;
         prod.lhs = get_id();
@@ -213,7 +213,7 @@ struct Variable
         return *this;
     }
 
-    inline constexpr Variable &operator=(const float val)
+    inline constexpr Variable &operator=(const float val) noexcept
     {
         Production prod;
         prod.lhs = get_id();
@@ -222,7 +222,7 @@ struct Variable
         return *this;
     }
 
-    inline constexpr Variable &operator+=(const VariableExpression &expr)
+    inline constexpr Variable &operator+=(const VariableExpression &expr) noexcept
     {
         Variable tmp = expr;
         *this = *this + tmp;
@@ -230,21 +230,21 @@ struct Variable
         return *this;
     }
 
-    inline constexpr Variable &operator-=(const VariableExpression &expr)
+    inline constexpr Variable &operator-=(const VariableExpression &expr) noexcept
     {
         Variable tmp = expr;
         *this = *this - tmp;
         return *this;
     }
 
-    inline constexpr Variable &operator*=(const VariableExpression &expr)
+    inline constexpr Variable &operator*=(const VariableExpression &expr) noexcept
     {
         Variable tmp = expr;
         *this = *this * tmp;
         return *this;
     }
 
-    inline constexpr Variable &operator/=(const VariableExpression &expr)
+    inline constexpr Variable &operator/=(const VariableExpression &expr) noexcept
     {
         Variable tmp = expr;
         *this = *this / tmp;
@@ -252,33 +252,33 @@ struct Variable
     }
 
     // Assignment operators with float
-    inline constexpr Variable &operator+=(const float val)
+    inline constexpr Variable &operator+=(const float val) noexcept
     {
         VariableExpression tmp = *this + val;
         *this = tmp;
         return *this;
     }
 
-    inline constexpr Variable &operator-=(const float val)
+    inline constexpr Variable &operator-=(const float val) noexcept
     {
         VariableExpression tmp = *this - val;
         *this = tmp;
         return *this;
     }
-    inline constexpr Variable &operator*=(const float val)
+    inline constexpr Variable &operator*=(const float val) noexcept
     {
         VariableExpression tmp = *this * val;
         *this = tmp;
         return *this;
     }
-    inline constexpr Variable &operator/=(const float val)
+    inline constexpr Variable &operator/=(const float val) noexcept
     {
         VariableExpression tmp = *this / val;
         *this = tmp;
         return *this;
     }
 
-    inline constexpr Variable(const Variable &other)
+    inline constexpr Variable(const Variable &other) noexcept
         : log{other.log}
     {
         Production p;
@@ -291,82 +291,90 @@ struct Variable
     // inline constexpr ~Variable() {}
 
 private:
-    inline constexpr Variable create_without_logging() const { return Variable{this->log}; }
-    constexpr const Variable *get_id() const { return this; }
+    inline constexpr Variable create_without_logging() const noexcept
+    {
+        return Variable{this->log};
+    }
+    constexpr const Variable *get_id() const noexcept { return this; }
 };
 
-inline constexpr VariableExpression operator+(float lhs, const Variable &rhs)
+inline constexpr VariableExpression operator+(float lhs, const Variable &rhs) noexcept
 {
     return {lhs, &rhs, Operations::ADD, rhs.log};
 }
 
-inline constexpr VariableExpression operator-(float lhs, const Variable &rhs)
+inline constexpr VariableExpression operator-(float lhs, const Variable &rhs) noexcept
 {
     return {lhs, &rhs, Operations::SUBSTRACT, rhs.log};
 }
-inline constexpr VariableExpression operator*(float lhs, const Variable &rhs)
+inline constexpr VariableExpression operator*(float lhs, const Variable &rhs) noexcept
 {
     return {lhs, &rhs, Operations::MULTIPLY, rhs.log};
 }
-inline constexpr VariableExpression operator/(float lhs, const Variable &rhs)
+inline constexpr VariableExpression operator/(float lhs, const Variable &rhs) noexcept
 {
     return {lhs, &rhs, Operations::DIVIDE, rhs.log};
 }
 
 // Experimental: Expression-Variable operators allowing for ex. v0 = v1 + v2 * 2;
-inline constexpr VariableExpression operator+(const Variable &lhs, const VariableExpression &rhs)
+inline constexpr VariableExpression operator+(const Variable &lhs,
+                                              const VariableExpression &rhs) noexcept
 {
     Variable tmp = rhs;
     return lhs + tmp;
 }
 
-inline constexpr VariableExpression operator-(const Variable &lhs, const VariableExpression &rhs)
+inline constexpr VariableExpression operator-(const Variable &lhs,
+                                              const VariableExpression &rhs) noexcept
 {
     Variable tmp = rhs;
     return lhs + tmp;
 }
-inline constexpr VariableExpression operator*(const Variable &lhs, const VariableExpression &rhs)
+inline constexpr VariableExpression operator*(const Variable &lhs,
+                                              const VariableExpression &rhs) noexcept
 {
     Variable tmp = rhs;
     return lhs + tmp;
 }
-inline constexpr VariableExpression operator/(const Variable &lhs, const VariableExpression &rhs)
+inline constexpr VariableExpression operator/(const Variable &lhs,
+                                              const VariableExpression &rhs) noexcept
 {
     Variable tmp = rhs;
     return lhs + tmp;
 }
 
-inline constexpr VariableExpression operator+(const VariableExpression &lhs, const Variable &rhs)
+inline constexpr VariableExpression operator+(const VariableExpression &lhs,
+                                              const Variable &rhs) noexcept
 {
     Variable tmp = rhs;
     return tmp + rhs;
 }
 
-inline constexpr VariableExpression operator+(const VariableExpression &lhs, float rhs)
+inline constexpr VariableExpression operator+(const VariableExpression &lhs, float rhs) noexcept
 {
     Variable tmp = lhs;
     return tmp + rhs;
 }
 
-inline constexpr VariableExpression operator-(const VariableExpression &lhs, float rhs)
+inline constexpr VariableExpression operator-(const VariableExpression &lhs, float rhs) noexcept
 {
     Variable tmp = lhs;
     return tmp - rhs;
 }
 
-inline constexpr VariableExpression operator*(const VariableExpression &lhs, float rhs)
+inline constexpr VariableExpression operator*(const VariableExpression &lhs, float rhs) noexcept
 {
     Variable tmp = lhs;
     return tmp * rhs;
 }
 
-inline constexpr VariableExpression operator/(const VariableExpression &lhs, float rhs)
+inline constexpr VariableExpression operator/(const VariableExpression &lhs, float rhs) noexcept
 {
     Variable tmp = lhs;
     return tmp / rhs;
 }
 
-inline constexpr VariableExpression operator-(const VariableExpression &operand)
+inline constexpr VariableExpression operator-(const VariableExpression &operand) noexcept
 {
     Variable tmp = operand;
     return -tmp;
@@ -410,7 +418,7 @@ template<>
 struct fmt::formatter<std::variant<const trace::Variable *, float>> : formatter<string_view>
 {
     template<typename FormatContext>
-    auto format(const std::variant<const trace::Variable *, float> &var, FormatContext &ctx)
+    auto format(const std::variant<const trace::Variable *, float> var, FormatContext &ctx)
     {
         if (std::holds_alternative<const trace::Variable *>(var)) {
             return format_to(ctx.out(), "{}", fmt::ptr(std::get<const trace::Variable *>(var)));

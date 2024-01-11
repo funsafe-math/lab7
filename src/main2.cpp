@@ -70,7 +70,7 @@ template<>
 struct fmt::formatter<analysis::Variable> : formatter<string_view>
 {
     template<typename FormatContext>
-    auto format(const analysis::Variable &variable, FormatContext &ctx)
+    auto format(const analysis::Variable variable, FormatContext &ctx)
     {
         return format_to(ctx.out(), "{}_{}", variable.type, variable.index);
     }
