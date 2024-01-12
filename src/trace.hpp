@@ -1,7 +1,8 @@
 #pragma once
+#ifndef TRACE_HPP
+#define TRACE_HPP
 
 #include <cstddef>
-#include <optional>
 #include <variant>
 #include <vector>
 
@@ -387,7 +388,7 @@ template<>
 struct fmt::formatter<trace::Operations> : formatter<string_view>
 {
     template<typename FormatContext>
-    auto format(trace::Operations op, FormatContext &ctx)
+    constexpr auto format(trace::Operations op, FormatContext &ctx)
     {
         string_view name = "unknown";
         switch (op) {
@@ -418,13 +419,13 @@ template<>
 struct fmt::formatter<std::variant<const trace::Variable *, float>> : formatter<string_view>
 {
     template<typename FormatContext>
-    auto format(const std::variant<const trace::Variable *, float> var, FormatContext &ctx)
+    constexpr auto format(const std::variant<const trace::Variable *, float> var, FormatContext &ctx)
     {
         if (std::holds_alternative<const trace::Variable *>(var)) {
-            return format_to(ctx.out(), "{}", fmt::ptr(std::get<const trace::Variable *>(var)));
+            return fmt::format_to(ctx.out(), "{}", fmt::ptr(std::get<const trace::Variable *>(var)));
         }
         if (std::holds_alternative<float>(var)) {
-            return format_to(ctx.out(), "{}", std::get<float>(var));
+            return fmt::format_to(ctx.out(), "{}", std::get<float>(var));
         }
         throw std::runtime_error("Unknown variant");
     }
@@ -434,7 +435,7 @@ template<>
 struct fmt::formatter<trace::Expression> : formatter<string_view>
 {
     template<typename FormatContext>
-    auto format(const trace::Expression &expr, FormatContext &ctx)
+    constexpr auto format(const trace::Expression &expr, FormatContext &ctx)
     {
         switch (expr.op) {
         // case trace::Operations::UNKNOWN:
@@ -443,12 +444,12 @@ struct fmt::formatter<trace::Expression> : formatter<string_view>
         case trace::Operations::SUBSTRACT:
         case trace::Operations::MULTIPLY:
         case trace::Operations::DIVIDE:
-            return format_to(ctx.out(), "({} {} {})", expr.lhs, expr.op, expr.rhs);
+            return fmt::format_to(ctx.out(), "({} {} {})", expr.lhs, expr.op, expr.rhs);
         case trace::Operations::VALUE:
-            return format_to(ctx.out(), "{}", expr.lhs);
+            return fmt::format_to(ctx.out(), "{}", expr.lhs);
             break;
         case trace::Operations::UNARY_SUBSTRACT:
-            return format_to(ctx.out(), "(- {})", expr.lhs);
+            return fmt::format_to(ctx.out(), "(- {})", expr.lhs);
             break;
         }
         throw std::runtime_error("UNKNOWN operation");
@@ -459,8 +460,10 @@ template<>
 struct fmt::formatter<trace::Production> : formatter<string_view>
 {
     template<typename FormatContext>
-    auto format(const trace::Production &prod, FormatContext &ctx)
+    constexpr auto format(const trace::Production &prod, FormatContext &ctx)
     {
-        return format_to(ctx.out(), "{} := {}", fmt::ptr(prod.lhs), prod.rhs);
+        return fmt::format_to(ctx.out(), "{} := {}", fmt::ptr(prod.lhs), prod.rhs);
     }
 };
+
+#endif // TRACE_HPP

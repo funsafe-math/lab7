@@ -2,8 +2,8 @@
 
 #include "analysis.hpp"
 
-namespace analysis
-{
+namespace analysis {
+struct Production;
 struct Graph
 {
     std::vector<Production> nodes{};

@@ -1,4 +1,6 @@
 #pragma once
+#ifndef ANALYSIS_HPP
+#define ANALYSIS_HPP
 
 #include <cstddef>
 #include <span>
@@ -219,7 +221,7 @@ template<>
 struct fmt::formatter<analysis::Variable> : formatter<string_view>
 {
     template<typename FormatContext>
-    auto format(analysis::Variable variable, FormatContext &ctx)
+    constexpr auto format(analysis::Variable variable, FormatContext &ctx)
     {
         // TODO: finish
         return std::visit(
@@ -227,14 +229,14 @@ struct fmt::formatter<analysis::Variable> : formatter<string_view>
                 using T = std::decay_t<decltype(x)>;
                 if constexpr (std::is_same_v<T, std::monostate>) {
                     throw std::runtime_error("This should never happen");
-                    return format_to(ctx.out(), "Error");
+                    return fmt::format_to(ctx.out(), "Error");
                 }
                 if constexpr (std::is_same_v<T, analysis::TemporaryVariable>)
-                    return format_to(ctx.out(), "temporary_{}", x.number);
+                    return fmt::format_to(ctx.out(), "temporary_{}", x.number);
                 if constexpr (std::is_same_v<T, analysis::FinalVariable>)
-                    return format_to(ctx.out(), "final_{}", x.index);
+                    return fmt::format_to(ctx.out(), "final_{}", x.index);
                 if constexpr (std::is_same_v<T, analysis::LiteralVariable>)
-                    return format_to(ctx.out(), "(literal: {})", x.value);
+                    return fmt::format_to(ctx.out(), "(literal: {})", x.value);
             },
             variable);
     }
@@ -244,16 +246,16 @@ template<>
 struct fmt::formatter<analysis::WritableVariable> : formatter<string_view>
 {
     template<typename FormatContext>
-    auto format(analysis::WritableVariable variable, FormatContext &ctx)
+    constexpr auto format(analysis::WritableVariable variable, FormatContext &ctx)
     {
         // TODO: finish
         return std::visit(
             [&](const auto x) -> auto {
                 using T = std::decay_t<decltype(x)>;
                 if constexpr (std::is_same_v<T, analysis::TemporaryVariable>)
-                    return format_to(ctx.out(), "temporary_{}", x.number);
+                    return fmt::format_to(ctx.out(), "temporary_{}", x.number);
                 if constexpr (std::is_same_v<T, analysis::FinalVariable>)
-                    return format_to(ctx.out(), "final_{}", x.index);
+                    return fmt::format_to(ctx.out(), "final_{}", x.index);
             },
             variable);
         // return formatter<string_view>::format(name, ctx);
@@ -264,13 +266,13 @@ template<>
 struct fmt::formatter<analysis::BinOp> : formatter<string_view>
 {
     template<typename FormatContext>
-    auto format(const analysis::BinOp &binary_operation, FormatContext &ctx)
+    constexpr auto format(const analysis::BinOp &binary_operation, FormatContext &ctx)
     {
-        return format_to(ctx.out(),
-                         "({} {} {})",
-                         binary_operation.lhs,
-                         binary_operation.op,
-                         binary_operation.rhs);
+        return fmt::format_to(ctx.out(),
+                              "({} {} {})",
+                              binary_operation.lhs,
+                              binary_operation.op,
+                              binary_operation.rhs);
     }
 };
 
@@ -278,9 +280,9 @@ template<>
 struct fmt::formatter<analysis::UnaryOp> : formatter<string_view>
 {
     template<typename FormatContext>
-    auto format(const analysis::UnaryOp &unary_operation, FormatContext &ctx)
+    constexpr auto format(const analysis::UnaryOp &unary_operation, FormatContext &ctx)
     {
-        return format_to(ctx.out(), "({}{})", unary_operation.op, unary_operation.var);
+        return fmt::format_to(ctx.out(), "({}{})", unary_operation.op, unary_operation.var);
     }
 };
 
@@ -288,17 +290,17 @@ template<>
 struct fmt::formatter<analysis::Expression> : formatter<string_view>
 {
     template<typename FormatContext>
-    auto format(const analysis::Expression &expr, FormatContext &ctx)
+    constexpr auto format(const analysis::Expression &expr, FormatContext &ctx)
     {
         if (std::holds_alternative<analysis::Variable>(expr)) {
-            return format_to(ctx.out(), "{}", std::get<analysis::Variable>(expr));
+            return fmt::format_to(ctx.out(), "{}", std::get<analysis::Variable>(expr));
         }
         if (std::holds_alternative<analysis::BinOp>(expr)) {
-            return format_to(ctx.out(), "{}", std::get<analysis::BinOp>(expr));
+            return fmt::format_to(ctx.out(), "{}", std::get<analysis::BinOp>(expr));
         }
 
         if (std::holds_alternative<analysis::UnaryOp>(expr)) {
-            return format_to(ctx.out(), "{}", std::get<analysis::UnaryOp>(expr));
+            return fmt::format_to(ctx.out(), "{}", std::get<analysis::UnaryOp>(expr));
         }
         throw std::runtime_error("This should never happen");
     }
@@ -308,8 +310,9 @@ template<>
 struct fmt::formatter<analysis::Production> : formatter<string_view>
 {
     template<typename FormatContext>
-    auto format(const analysis::Production &prod, FormatContext &ctx)
+    constexpr auto format(const analysis::Production &prod, FormatContext &ctx)
     {
-        return format_to(ctx.out(), "{} := {}", prod.lhs, prod.rhs);
+        return fmt::format_to(ctx.out(), "{} := {}", prod.lhs, prod.rhs);
     }
 };
+#endif // ANALYSIS_HPP
