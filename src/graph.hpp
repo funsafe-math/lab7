@@ -1,5 +1,4 @@
 #pragma once
-
 #include "analysis.hpp"
 
 namespace analysis {

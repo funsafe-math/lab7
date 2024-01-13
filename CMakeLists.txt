@@ -41,15 +41,16 @@ add_executable(tracing
 )
 
 add_executable(analysis
-   src/analysis.hpp
-   src/analysis.cpp
+    src/analysis.hpp
+   src/test_analysis.cpp
 
    src/graph.hpp
    src/graph.cpp
+   src/problem.hpp src/problem.cpp
 )
 
 add_executable(simple_elimination_test
-    test/simple_elimination_test.cpp
+    test/elimination_test.cpp
     src/Matrix.hpp
 )
 target_link_libraries(simple_elimination_test fmt::fmt)
@@ -78,11 +79,11 @@ install(TARGETS lab7
 
 enable_testing()
 add_test(
-  NAME simple_elimination_test
+  NAME 3x3_elimination_test
   COMMAND $<TARGET_FILE:simple_elimination_test> ${CMAKE_CURRENT_LIST_DIR}/in.txt ${CMAKE_CURRENT_LIST_DIR}/out.txt
 )
 
 add_test(
-  NAME big_elimination_test
+  NAME 15x15_elimination_test
   COMMAND $<TARGET_FILE:simple_elimination_test> ${CMAKE_CURRENT_LIST_DIR}/in15.txt ${CMAKE_CURRENT_LIST_DIR}/out15.txt
 )
