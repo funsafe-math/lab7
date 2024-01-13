@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <map>
 #include <random>
+#include <ranges>
 #include <span>
 #include <sstream>
 #include <stack>
@@ -210,8 +211,8 @@ void test_with_matrix()
     // vec[0] = vec[1] + vec[0];
     // vec[1] = vec[1] + 0.1;
 
-    constexpr size_t width = 61;
-    constexpr size_t height = 60;
+    constexpr size_t width = 41;
+    constexpr size_t height = 40;
 
     Matrix<trace::Variable> mat{width, height, problem.get_element()};
     problem.log.clear();
@@ -357,12 +358,15 @@ void generate_c_code()
     // problem.generate_c_code();
 }
 
-std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production> productions)
+constexpr std::vector<std::vector<size_t>> better_fnf(
+    const std::span<analysis::Production> productions)
 {
     std::vector<std::vector<size_t>> groups{};
     std::vector<size_t> group{};
+    group.reserve(productions.size());
     std::vector<size_t>
         not_added{}; // TODO: instead of using this, create a superproduction, and also create one for groups
+    not_added.reserve(productions.size());
 
     std::vector<size_t> remaining_productions{};
     for (size_t i = 0; i < productions.size(); ++i) {
@@ -386,7 +390,6 @@ std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production
                 return false;
             }
         }
-
         return true;
     };
 
@@ -397,9 +400,7 @@ std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production
         // for (const size_t a_ix : remaining_productions) {
         const analysis::Production &a = productions[a_ix];
         group.push_back(a_ix);
-        // for (const size_t b_ix : remaining_productions) {
-        for (size_t i = 1; i < remaining_productions.size(); i++) {
-            size_t b_ix = remaining_productions.at(i);
+        for (size_t b_ix : remaining_productions | std::ranges::views::drop(1)) {
             const analysis::Production &b = productions[b_ix];
             if (can_be_added(b_ix)) {
                 group.push_back(b_ix);
@@ -407,15 +408,12 @@ std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production
                 not_added.push_back(b_ix);
             }
         }
-        // if (group.size())
-        //     return;
-        // }
         assert(group.size());
-        fmt::println("Group contents:");
-        for (const auto i : group) {
-            fmt::println("{} : {}", i, productions[i]);
-        }
-        std::cout << std::flush;
+        // fmt::println("Group contents:");
+        // for (const auto i : group) {
+        //     fmt::println("{} : {}", i, productions[i]);
+        // }
+        // std::cout << std::flush;
     };
 
     while (remaining_productions.size() > 0) {
@@ -428,39 +426,11 @@ std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production
             remaining_productions.erase(it);
         }
         // add group to groups
-        groups.emplace_back(group);
-        group.clear();
+        groups.emplace_back(std::move(group));
+        group.clear(); // to make sure
         not_added.clear();
         assert(remaining_productions.size() < starting_size);
     }
-
-    return groups;
-}
-
-std::vector<std::vector<size_t>> sorting_fnf(const std::span<analysis::Production> productions)
-{
-    std::vector<std::vector<size_t>> groups{};
-
-    std::vector<size_t> indexes;
-    for (size_t i = 0; i < productions.size(); ++i) {
-        indexes.push_back(i);
-    }
-
-    auto topological_compare = [&](size_t a_ix, size_t b_ix) -> bool { //
-        const analysis::Production &a = productions[a_ix];
-        const analysis::Production &b = productions[b_ix];
-        bool ret = a.is_dependent(b);
-        return ret;
-    };
-
-    while (!std::is_sorted(indexes.begin(), indexes.end(), topological_compare)) {
-        std::stable_sort(indexes.begin(), indexes.end(), topological_compare);
-        fmt::println("Is sorted: {}",
-                     std::is_sorted(indexes.begin(), indexes.end(), topological_compare));
-        fmt::println("Sorted: {}", indexes);
-    }
-
-    fmt::println("Sorted: {}", indexes);
 
     return groups;
 }
@@ -506,11 +476,83 @@ void test_batter_fnf()
     fmt::println("both FNFs are the same");
 }
 
+void test_with_matrix_better_fnf()
+{
+    analysis::Problem problem{};
+    // std::vector<Element> vec{100, &log};
+
+    // vec[0] = vec[1] + vec[0];
+    // vec[1] = vec[1] + 0.1;
+
+    constexpr size_t width = 41;
+    constexpr size_t height = 40;
+
+    Matrix<trace::Variable> mat{width, height, problem.get_element()};
+    problem.log.clear();
+    mat.gaussian_elimination();
+
+    // for (auto &v : problem.log) {
+    //     fmt::println("{}", v);
+    // }
+    fmt::println("##########################");
+    // problem.parse(mat.values_);
+    problem.productions = analysis::Problem::parse_pure(mat.values_, problem.log);
+    problem.FNF = better_fnf(problem.productions);
+
+    {
+        Matrix<float> mat{width, height, 0};
+        std::random_device rd;  // Will be used to obtain a seed for the random number engine
+        std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+        std::uniform_real_distribution<> dis(1.0, 2.0);
+        for (auto &v : mat.values_) {
+            v = dis(gen);
+        }
+
+        auto tick = std::chrono::high_resolution_clock::now();
+        problem.interpret_multithreaded(mat.values_);
+        auto tock = std::chrono::high_resolution_clock::now();
+        fmt::println("Multithreaded interpretation took {}",
+                     std::chrono::duration_cast<std::chrono::microseconds>(tock - tick));
+    }
+
+    {
+        Matrix<float> mat{width, height, 0};
+        std::random_device rd;  // Will be used to obtain a seed for the random number engine
+        std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+        std::uniform_real_distribution<> dis(1.0, 2.0);
+        for (auto &v : mat.values_) {
+            v = dis(gen);
+        }
+
+        auto tick = std::chrono::high_resolution_clock::now();
+        problem.interpret(mat.values_);
+        auto tock = std::chrono::high_resolution_clock::now();
+        fmt::println("Singlethreaded interpretation took {}",
+                     std::chrono::duration_cast<std::chrono::microseconds>(tock - tick));
+        print_matrix(mat);
+    }
+
+    // fmt::println("Graph: ");
+    // auto graph = problem.produce_dependence_graph();
+    // std::string dot = graph.transitive_reduction().as_dot();
+    // fmt::println("{}", graph.transitive_reduction().as_dot());
+    fmt::println("Productions processed: {}", problem.log.size());
+
+    auto elem = std::max_element(problem.FNF.begin(), problem.FNF.end(), [](auto a, auto b) {
+        return a.size() < b.size();
+    });
+    fmt::println("For a {}x{} matrix, you can use at most {} threads",
+                 mat.width_,
+                 mat.height_,
+                 elem->size());
+}
+
 int main()
 {
     test_batter_fnf();
     // test_implementation();
     // test_with_matrix();
+    // test_with_matrix_better_fnf();
     // generate_c_code();
     // multithreaded_test_implementation();
     // big_multithreaded_test_implementation();
