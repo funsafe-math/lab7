@@ -364,11 +364,8 @@ struct SuperProduction
 {
     std::set<analysis::TemporaryVariable> lhs_tmp;
     std::set<analysis::FinalVariable> lhs_final;
-    // std::set<analysis::WritableVariable> lhs;
-    // std::set<analysis::Expression> rhs;
     std::set<analysis::TemporaryVariable> rhs_tmp;
     std::set<analysis::FinalVariable> rhs_final;
-    // std::set<analysis::LiteralVariable> rhs_literal; // can be skipped
 
     bool is_depent_lhs(const analysis::WritableVariable v)
     {
@@ -429,9 +426,6 @@ struct SuperProduction
 
     bool is_dependent(const analysis::Production &p)
     {
-        // return lhs.contains(p.lhs) || rhs.contains(p.rhs);
-
-        // return this->rhs.contains(other.lhs) || other.rhs.contains(this->lhs);
         return is_depent_lhs(p.lhs) || is_dependent_rhs_expr(p.rhs);
     }
 
@@ -501,11 +495,6 @@ struct SuperProduction
         add_lhs(p.lhs);
         add_rhs(p.rhs);
     }
-    // void clear()
-    // {
-    //     // lhs.clear();
-    //     // rhs.clear();
-    // }
 };
 
 std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production> productions)
@@ -514,9 +503,6 @@ std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production
     std::vector<size_t> group{};
     group.reserve(productions.size());
     SuperProduction group_sp{};
-    // std::vector<size_t>
-    //     not_added_vec{}; // TODO: instead of using this, create a superproduction, and also create one for groups
-    // not_added_vec.reserve(productions.size());
     SuperProduction not_added{};
 
     std::vector<size_t> remaining_productions{};
@@ -528,29 +514,9 @@ std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production
         // Can be optimized by creating a super-production from current group
         const analysis::Production &p = productions[p_ix];
 
-        // for (size_t i : group) {
-        //     assert(i < productions.size());
-        //     const analysis::Production &a = productions[i];
-        //     if (a.is_dependent(p)) {
-        //         if (!group_sp.is_dependent(p)) {
-        //             assert(false);
-        //         }
-        //         return false;
-        //     }
-        // }
         if (group_sp.is_dependent(p)) {
             return false;
         }
-        // for (size_t bad_ix : not_added_vec) {
-        //     const analysis::Production &bad = productions[bad_ix];
-        //     if (bad.is_dependent(p)) {
-        //         if (!not_added.is_dependent(p)) {
-        //             return false;
-        //             assert(false);
-        //         }
-        //         return false;
-        //     }
-        // }
         if (not_added.is_dependent(p)) {
             return false;
         }
@@ -560,8 +526,6 @@ std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production
     auto step = [&]() {
         assert(remaining_productions.size());
         const size_t a_ix = remaining_productions.front();
-        // remaining_productions.erase(remaining_productions.begin());
-        // for (const size_t a_ix : remaining_productions) {
         const analysis::Production &a = productions[a_ix];
         group.push_back(a_ix);
         group_sp.add(a);
@@ -571,7 +535,6 @@ std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production
                 group.push_back(b_ix);
                 group_sp.add(b);
             } else {
-                // not_added_vec.push_back(b_ix);
                 not_added.add(b);
             }
         }
@@ -597,7 +560,6 @@ std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production
         group.clear(); // to make sure
         group_sp = SuperProduction();
         not_added = SuperProduction(); // somehow seems faster than .clear()
-        // not_added_vec.clear();
         assert(remaining_productions.size() < starting_size);
     }
 
