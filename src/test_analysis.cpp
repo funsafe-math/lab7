@@ -8,6 +8,7 @@
 #include <map>
 #include <random>
 #include <ranges>
+#include <set>
 #include <span>
 #include <sstream>
 #include <stack>
@@ -358,15 +359,31 @@ void generate_c_code()
     // problem.generate_c_code();
 }
 
-constexpr std::vector<std::vector<size_t>> better_fnf(
-    const std::span<analysis::Production> productions)
+// Store production variables efficiently
+struct SuperProduction
+{
+    std::set<analysis::WritableVariable> lhs;
+    std::set<analysis::Expression> rhs;
+    bool is_dependent(const analysis::Production &p)
+    {
+        return lhs.contains(p.lhs) || rhs.contains(p.rhs);
+    }
+    void add(const analysis::Production &p)
+    {
+        lhs.insert(p.lhs);
+        rhs.insert(p.rhs);
+    }
+};
+
+std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production> productions)
 {
     std::vector<std::vector<size_t>> groups{};
     std::vector<size_t> group{};
     group.reserve(productions.size());
-    std::vector<size_t>
-        not_added{}; // TODO: instead of using this, create a superproduction, and also create one for groups
-    not_added.reserve(productions.size());
+    // std::vector<size_t>
+    //     not_added{}; // TODO: instead of using this, create a superproduction, and also create one for groups
+    // not_added.reserve(productions.size());
+    SuperProduction not_added{};
 
     std::vector<size_t> remaining_productions{};
     for (size_t i = 0; i < productions.size(); ++i) {
@@ -384,11 +401,14 @@ constexpr std::vector<std::vector<size_t>> better_fnf(
                 return false;
             }
         }
-        for (size_t bad_ix : not_added) {
-            const analysis::Production &bad = productions[bad_ix];
-            if (bad.is_dependent(p)) {
-                return false;
-            }
+        // for (size_t bad_ix : not_added) {
+        //     const analysis::Production &bad = productions[bad_ix];
+        //     if (bad.is_dependent(p)) {
+        //         return false;
+        //     }
+        // }
+        if (not_added.is_dependent(p)) {
+            return false;
         }
         return true;
     };
@@ -405,7 +425,8 @@ constexpr std::vector<std::vector<size_t>> better_fnf(
             if (can_be_added(b_ix)) {
                 group.push_back(b_ix);
             } else {
-                not_added.push_back(b_ix);
+                // not_added.push_back(b_ix);
+                not_added.add(b);
             }
         }
         assert(group.size());
@@ -428,7 +449,7 @@ constexpr std::vector<std::vector<size_t>> better_fnf(
         // add group to groups
         groups.emplace_back(std::move(group));
         group.clear(); // to make sure
-        not_added.clear();
+        not_added = SuperProduction();
         assert(remaining_productions.size() < starting_size);
     }
 
@@ -549,10 +570,10 @@ void test_with_matrix_better_fnf()
 
 int main()
 {
-    test_batter_fnf();
+    // test_batter_fnf();
     // test_implementation();
     // test_with_matrix();
-    // test_with_matrix_better_fnf();
+    test_with_matrix_better_fnf();
     // generate_c_code();
     // multithreaded_test_implementation();
     // big_multithreaded_test_implementation();
