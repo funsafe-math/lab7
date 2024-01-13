@@ -362,22 +362,150 @@ void generate_c_code()
 // Store production variables efficiently
 struct SuperProduction
 {
-    std::set<analysis::WritableVariable> lhs;
-    std::set<analysis::Expression> rhs;
+    std::set<analysis::TemporaryVariable> lhs_tmp;
+    std::set<analysis::FinalVariable> lhs_final;
+    // std::set<analysis::WritableVariable> lhs;
+    // std::set<analysis::Expression> rhs;
+    std::set<analysis::TemporaryVariable> rhs_tmp;
+    std::set<analysis::FinalVariable> rhs_final;
+    // std::set<analysis::LiteralVariable> rhs_literal; // can be skipped
+
+    bool is_depent_lhs(const analysis::WritableVariable v)
+    {
+        return std::visit(
+            [&](auto x) -> bool {
+                using T = std::decay_t<decltype(x)>;
+                if constexpr (std::is_same_v<T, analysis::TemporaryVariable>) {
+                    return rhs_tmp.contains(x);
+                }
+                if constexpr (std::is_same_v<T, analysis::FinalVariable>) {
+                    return rhs_final.contains(x);
+                }
+            },
+            v);
+    }
+
+    bool is_depent_rhs(const analysis::Variable v)
+    {
+        return std::visit(
+            [&](auto x) -> bool {
+                using T = std::decay_t<decltype(x)>;
+                if constexpr (std::is_same_v<T, analysis::TemporaryVariable>) {
+                    return lhs_tmp.contains(x);
+                }
+                if constexpr (std::is_same_v<T, analysis::FinalVariable>) {
+                    return lhs_final.contains(x);
+                }
+                if constexpr (std::is_same_v<T, analysis::LiteralVariable>) {
+                    return false; // ignore
+                }
+            },
+            v);
+    }
+
+    bool is_dependent_rhs_expr(const analysis::Expression &e)
+    {
+        return std::visit(
+            [&](auto x) -> bool {
+                using T = std::decay_t<decltype(x)>;
+                if constexpr (std::is_same_v<T, analysis::Variable>) {
+                    return is_depent_rhs(x);
+                }
+                if constexpr (std::is_same_v<T, analysis::BinOp>) {
+                    return is_dependent_rhs(x);
+                }
+                if constexpr (std::is_same_v<T, analysis::UnaryOp>) {
+                    return is_dependent_rhs(x);
+                }
+            },
+            e);
+    }
+
+    bool is_dependent_rhs(const analysis::BinOp &v)
+    {
+        return is_depent_rhs(v.lhs) || is_depent_rhs(v.rhs);
+    }
+    bool is_dependent_rhs(const analysis::UnaryOp &op) { return is_depent_rhs(op.var); }
+
     bool is_dependent(const analysis::Production &p)
     {
-        return lhs.contains(p.lhs) || rhs.contains(p.rhs);
+        // return lhs.contains(p.lhs) || rhs.contains(p.rhs);
+
+        // return this->rhs.contains(other.lhs) || other.rhs.contains(this->lhs);
+        return is_depent_lhs(p.lhs) || is_dependent_rhs_expr(p.rhs);
     }
+
+    constexpr void add_lhs(const analysis::WritableVariable v)
+    {
+        std::visit(
+            [&](auto x) -> void {
+                using T = std::decay_t<decltype(x)>;
+                if constexpr (std::is_same_v<T, analysis::TemporaryVariable>) {
+                    lhs_tmp.insert(x);
+                    return;
+                }
+                if constexpr (std::is_same_v<T, analysis::FinalVariable>) {
+                    lhs_final.insert(x);
+                    return;
+                }
+            },
+            v);
+    }
+
+    constexpr void add_rhs_variable(const analysis::Variable v)
+    {
+        std::visit(
+            [&](auto x) -> void {
+                using T = std::decay_t<decltype(x)>;
+                if constexpr (std::is_same_v<T, analysis::TemporaryVariable>) {
+                    rhs_tmp.insert(x);
+                    return;
+                }
+                if constexpr (std::is_same_v<T, analysis::FinalVariable>) {
+                    rhs_final.insert(x);
+                }
+                if constexpr (std::is_same_v<T, analysis::LiteralVariable>) {
+                    return; // ignore
+                }
+            },
+            v);
+    }
+
+    void add_rhs_bin_op(const analysis::BinOp &v)
+    {
+        add_rhs_variable(v.lhs);
+        add_rhs_variable(v.rhs);
+    }
+    void add_rhs_unary_op(const analysis::UnaryOp &op) { add_rhs_variable(op.var); }
+
+    void add_rhs(const analysis::Expression &e)
+    {
+        std::visit(
+            [&](auto x) -> void {
+                using T = std::decay_t<decltype(x)>;
+                if constexpr (std::is_same_v<T, analysis::Variable>) {
+                    return add_rhs_variable(x);
+                }
+                if constexpr (std::is_same_v<T, analysis::BinOp>) {
+                    return add_rhs_bin_op(x);
+                }
+                if constexpr (std::is_same_v<T, analysis::UnaryOp>) {
+                    return add_rhs_unary_op(x);
+                }
+            },
+            e);
+    }
+
     void add(const analysis::Production &p)
     {
-        lhs.insert(p.lhs);
-        rhs.insert(p.rhs);
+        add_lhs(p.lhs);
+        add_rhs(p.rhs);
     }
-    void clear()
-    {
-        lhs.clear();
-        rhs.clear();
-    }
+    // void clear()
+    // {
+    //     // lhs.clear();
+    //     // rhs.clear();
+    // }
 };
 
 std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production> productions)
@@ -387,8 +515,8 @@ std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production
     group.reserve(productions.size());
     SuperProduction group_sp{};
     // std::vector<size_t>
-    //     not_added{}; // TODO: instead of using this, create a superproduction, and also create one for groups
-    // not_added.reserve(productions.size());
+    //     not_added_vec{}; // TODO: instead of using this, create a superproduction, and also create one for groups
+    // not_added_vec.reserve(productions.size());
     SuperProduction not_added{};
 
     std::vector<size_t> remaining_productions{};
@@ -404,15 +532,22 @@ std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production
         //     assert(i < productions.size());
         //     const analysis::Production &a = productions[i];
         //     if (a.is_dependent(p)) {
+        //         if (!group_sp.is_dependent(p)) {
+        //             assert(false);
+        //         }
         //         return false;
         //     }
         // }
         if (group_sp.is_dependent(p)) {
             return false;
         }
-        // for (size_t bad_ix : not_added) {
+        // for (size_t bad_ix : not_added_vec) {
         //     const analysis::Production &bad = productions[bad_ix];
         //     if (bad.is_dependent(p)) {
+        //         if (!not_added.is_dependent(p)) {
+        //             return false;
+        //             assert(false);
+        //         }
         //         return false;
         //     }
         // }
@@ -429,13 +564,14 @@ std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production
         // for (const size_t a_ix : remaining_productions) {
         const analysis::Production &a = productions[a_ix];
         group.push_back(a_ix);
+        group_sp.add(a);
         for (size_t b_ix : remaining_productions | std::ranges::views::drop(1)) {
             const analysis::Production &b = productions[b_ix];
             if (can_be_added(b_ix)) {
                 group.push_back(b_ix);
                 group_sp.add(b);
             } else {
-                // not_added.push_back(b_ix);
+                // not_added_vec.push_back(b_ix);
                 not_added.add(b);
             }
         }
@@ -461,6 +597,7 @@ std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production
         group.clear(); // to make sure
         group_sp = SuperProduction();
         not_added = SuperProduction(); // somehow seems faster than .clear()
+        // not_added_vec.clear();
         assert(remaining_productions.size() < starting_size);
     }
 
