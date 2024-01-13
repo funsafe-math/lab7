@@ -373,6 +373,11 @@ struct SuperProduction
         lhs.insert(p.lhs);
         rhs.insert(p.rhs);
     }
+    void clear()
+    {
+        lhs.clear();
+        rhs.clear();
+    }
 };
 
 std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production> productions)
@@ -380,6 +385,7 @@ std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production
     std::vector<std::vector<size_t>> groups{};
     std::vector<size_t> group{};
     group.reserve(productions.size());
+    SuperProduction group_sp{};
     // std::vector<size_t>
     //     not_added{}; // TODO: instead of using this, create a superproduction, and also create one for groups
     // not_added.reserve(productions.size());
@@ -394,12 +400,15 @@ std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production
         // Can be optimized by creating a super-production from current group
         const analysis::Production &p = productions[p_ix];
 
-        for (size_t i : group) {
-            assert(i < productions.size());
-            const analysis::Production &a = productions[i];
-            if (a.is_dependent(p)) {
-                return false;
-            }
+        // for (size_t i : group) {
+        //     assert(i < productions.size());
+        //     const analysis::Production &a = productions[i];
+        //     if (a.is_dependent(p)) {
+        //         return false;
+        //     }
+        // }
+        if (group_sp.is_dependent(p)) {
+            return false;
         }
         // for (size_t bad_ix : not_added) {
         //     const analysis::Production &bad = productions[bad_ix];
@@ -424,6 +433,7 @@ std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production
             const analysis::Production &b = productions[b_ix];
             if (can_be_added(b_ix)) {
                 group.push_back(b_ix);
+                group_sp.add(b);
             } else {
                 // not_added.push_back(b_ix);
                 not_added.add(b);
@@ -449,7 +459,8 @@ std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production
         // add group to groups
         groups.emplace_back(std::move(group));
         group.clear(); // to make sure
-        not_added = SuperProduction();
+        group_sp = SuperProduction();
+        not_added = SuperProduction(); // somehow seems faster than .clear()
         assert(remaining_productions.size() < starting_size);
     }
 
