@@ -17,7 +17,6 @@
 
 #include "Matrix.hpp"
 #include "analysis.hpp"
-#include "graph.hpp"
 #include "problem.hpp"
 
 std::string url_encode(const std::string &value)
@@ -362,12 +361,12 @@ void generate_c_code()
 // Store production variables efficiently
 struct SuperProduction
 {
-    std::set<analysis::TemporaryVariable> lhs_tmp;
-    std::set<analysis::FinalVariable> lhs_final;
-    std::set<analysis::TemporaryVariable> rhs_tmp;
-    std::set<analysis::FinalVariable> rhs_final;
+    std::set<analysis::TemporaryVariable> lhs_tmp{};
+    std::set<analysis::FinalVariable> lhs_final{};
+    std::set<analysis::TemporaryVariable> rhs_tmp{};
+    std::set<analysis::FinalVariable> rhs_final{};
 
-    bool is_depent_lhs(const analysis::WritableVariable v)
+    bool is_depent_lhs(const analysis::WritableVariable v) const noexcept
     {
         return std::visit(
             [&](auto x) -> bool {
@@ -382,7 +381,7 @@ struct SuperProduction
             v);
     }
 
-    bool is_depent_rhs(const analysis::Variable v)
+    bool is_depent_rhs(const analysis::Variable v) const noexcept
     {
         return std::visit(
             [&](auto x) -> bool {
@@ -400,7 +399,7 @@ struct SuperProduction
             v);
     }
 
-    bool is_dependent_rhs_expr(const analysis::Expression &e)
+    bool is_dependent_rhs_expr(const analysis::Expression &e) const noexcept
     {
         return std::visit(
             [&](auto x) -> bool {
@@ -418,18 +417,21 @@ struct SuperProduction
             e);
     }
 
-    bool is_dependent_rhs(const analysis::BinOp &v)
+    bool is_dependent_rhs(const analysis::BinOp &v) const noexcept
     {
         return is_depent_rhs(v.lhs) || is_depent_rhs(v.rhs);
     }
-    bool is_dependent_rhs(const analysis::UnaryOp &op) { return is_depent_rhs(op.var); }
+    bool is_dependent_rhs(const analysis::UnaryOp &op) const noexcept
+    {
+        return is_depent_rhs(op.var);
+    }
 
-    bool is_dependent(const analysis::Production &p)
+    bool is_dependent(const analysis::Production &p) const noexcept
     {
         return is_depent_lhs(p.lhs) || is_dependent_rhs_expr(p.rhs);
     }
 
-    constexpr void add_lhs(const analysis::WritableVariable v)
+    constexpr void add_lhs(const analysis::WritableVariable v) noexcept
     {
         std::visit(
             [&](auto x) -> void {
@@ -446,7 +448,7 @@ struct SuperProduction
             v);
     }
 
-    constexpr void add_rhs_variable(const analysis::Variable v)
+    constexpr void add_rhs_variable(const analysis::Variable v) noexcept
     {
         std::visit(
             [&](auto x) -> void {
@@ -465,14 +467,14 @@ struct SuperProduction
             v);
     }
 
-    void add_rhs_bin_op(const analysis::BinOp &v)
+    void add_rhs_bin_op(const analysis::BinOp &v) noexcept
     {
         add_rhs_variable(v.lhs);
         add_rhs_variable(v.rhs);
     }
-    void add_rhs_unary_op(const analysis::UnaryOp &op) { add_rhs_variable(op.var); }
+    void add_rhs_unary_op(const analysis::UnaryOp &op) noexcept { add_rhs_variable(op.var); }
 
-    void add_rhs(const analysis::Expression &e)
+    void add_rhs(const analysis::Expression &e) noexcept
     {
         std::visit(
             [&](auto x) -> void {
@@ -505,7 +507,7 @@ std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production
     SuperProduction group_sp{};
     SuperProduction not_added{};
 
-    std::vector<size_t> remaining_productions{};
+    std::deque<size_t> remaining_productions{};
     for (size_t i = 0; i < productions.size(); ++i) {
         remaining_productions.push_back(i);
     }
@@ -523,7 +525,7 @@ std::vector<std::vector<size_t>> better_fnf(const std::span<analysis::Production
         return true;
     };
 
-    auto step = [&]() {
+    auto step = [&]() noexcept {
         assert(remaining_productions.size());
         const size_t a_ix = remaining_productions.front();
         const analysis::Production &a = productions[a_ix];
